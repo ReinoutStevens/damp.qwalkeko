@@ -3,6 +3,7 @@
   (:use [clojure.core.logic])
   (:use scrapperplugin.clj.reification)
   (:use scrapperplugin.clj.mli)
+  (:use damp.ekeko.workspace.reification)
   (:use damp.qwal))
 
 

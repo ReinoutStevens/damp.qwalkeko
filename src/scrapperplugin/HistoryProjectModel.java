@@ -54,7 +54,7 @@ public class HistoryProjectModel extends ProjectModel {
 		}
 		System.out.println("Populated history model for project: "
 				+ getProject().getName());
-		addEkekoNatures();
+		//addEkekoNatures();
 		System.out.println("Added ekekko natures to all versions");
 	}
 

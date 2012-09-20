@@ -20,7 +20,6 @@ public class MetaVersionHandler {
 	private String commitMessage;
 	private String author;
 	private String revision;
-	private File location;
 	
 	private Collection<String> successors = new TreeSet<String>();
 	private Collection<String> predecessors = new TreeSet<String>();
@@ -34,7 +33,6 @@ public class MetaVersionHandler {
 		int revisionIdx = atts.getIndex(uri, "revision");
 		int commitIdx = atts.getIndex(uri, "commit");
 		int authorIdx = atts.getIndex(uri, "author");
-		int locationIdx = atts.getIndex(uri, "location");
 		if(revisionIdx == -1){
 			throwException("revision number");
 		}
@@ -44,13 +42,10 @@ public class MetaVersionHandler {
 		if(authorIdx == -1){
 			throwException("author");
 		}
-		if(locationIdx == -1){
-			throwException("location");
-		}
+		
 		this.revision = atts.getValue(revisionIdx);
 		this.commitMessage = atts.getValue(commitIdx);
 		this.author = atts.getValue(authorIdx);
-		this.location = new File(atts.getValue(locationIdx));
 	}
 	
 	public void parseTime (String uri, String name, String qName, Attributes atts) throws SAXException{
@@ -109,7 +104,7 @@ public class MetaVersionHandler {
 		if(revision == null || commitMessage == null || author == null || time == null){
 			throw new SAXException("invalid version");
 		}
-		MetaVersion version = new MetaVersion(revision, commitMessage, author, location, time);
+		MetaVersion version = new MetaVersion(revision, commitMessage, author, time);
 		version.addSuccessors(successors);
 		version.addPredecessors(predecessors);
 		return version;

@@ -1,26 +1,41 @@
 package scrapperplugin;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.Vector;
 
+import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
-import org.xml.sax.Attributes;
-import org.xml.sax.SAXException;
-import org.xml.sax.SAXParseException;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+
+
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.api.errors.TransportException;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileRepository;
 
 public class MetaProject {
 	public static final String xmlName = "project.xml";
 	
 	
+	private Git sourceRepository;
+	private Git metaRepository;
+	
+
+
 	private String name;
-	private URI url;
+	private URI uri;
 	
 	private Map<String, MetaVersion> versions;
 	private Collection<MetaVersion> roots;
@@ -28,7 +43,7 @@ public class MetaProject {
 	
 	public MetaProject(String name, URI url){
 		this.name = name;
-		this.url = url;
+		this.uri = url;
 		this.versions = new TreeMap<String, MetaVersion>();
 		this.roots = new ArrayList<MetaVersion>();
 		this.eclipseProject = null;
@@ -46,23 +61,45 @@ public class MetaProject {
 
 
 	public URI getURI() {
-		return url;
+		return uri;
 	}
 
 
 
-	public void setURI(URI url) {
-		this.url = url;
+	public void setURI(URI uri) {
+		this.uri = uri;
 	}
-
 	
-	public void finalize(){
-		this.createEclipseMetaProject();
+	public void setSourceRepository() throws IOException {
+		File file = new File(uri.toString());
+		Repository rep = new FileRepository(file);
+		this.sourceRepository = new Git(rep);
+	}
+	
+	public Git getSourceRepository() {
+		assert(sourceRepository != null);
+		return sourceRepository;
+	}
+	
+
+	public Git getMetaRepository() {
+		assert(metaRepository != null);
+		return metaRepository;
+	}
+	
+	public void initialize() throws CoreException{
+		try{
+		this.createEclipseProjects();
 		for(MetaVersion v : versions.values()){
-			v.finalize(this);
+			v.initialize(this);
 		}
 		this.findAndSetRoots();
-		
+		this.setSourceRepository();
+		this.createMetaRepository();
+		} catch(Exception e){
+			IStatus status = new Status(IStatus.ERROR, Activator.PLUGIN_ID, e.getMessage(), e);
+			throw new CoreException(status);
+		}
 	}
 	
 	
@@ -105,15 +142,30 @@ public class MetaProject {
 		return versions.get(sha);
 	}
 	
-	private void createEclipseMetaProject(){
+	private void createEclipseProjects(){
 		eclipseProject = ResourcesPlugin.getWorkspace().getRoot().getProject(name);
 		//lets ignore this one...
 		try{
 			if(!eclipseProject.exists()){
 				eclipseProject.create(null);
 			}
+			
 		} catch(CoreException e){
 			e.printStackTrace();
 		}
+	}
+	
+	private void createMetaRepository() throws InvalidRemoteException, TransportException, GitAPIException, IOException{
+		Repository repo = getSourceRepository().getRepository();
+		File target = new File(eclipseProject.getLocation().toFile(), repositoryDir());
+		if(!target.exists()){ //if it exists we assume it has been cloned before
+			Git.cloneRepository().setDirectory(target).setURI(uri.toString()).call();
+		}
+		Repository metaRepo = new FileRepository(target);
+		metaRepository = new Git(metaRepo);
+	}
+	
+	private String repositoryDir(){
+		return "repository";
 	}
 }

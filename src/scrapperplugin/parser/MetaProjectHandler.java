@@ -1,10 +1,12 @@
 package scrapperplugin.parser;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
 
+import org.eclipse.core.runtime.CoreException;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 
@@ -48,7 +50,11 @@ public class MetaProjectHandler {
 		}
 		MetaProject project = new MetaProject(name, uri);
 		project.addVersions(versions);
-		project.finalize();
+		try{
+			project.initialize();
+		} catch(CoreException e){
+			throw new SAXException(e);
+		}
 		return project;
 	}
 }

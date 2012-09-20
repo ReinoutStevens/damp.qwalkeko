@@ -46,6 +46,18 @@
 (defn endversion? [version]
   (.isEndVersion version))
 
+(defn ensure-checkout [version]
+  (.openAndCheckoutIfNeeded version))
+
+(defn ensure-checkouto [version]
+  (== nil (ensure-checkout version)))
+
+(defn ensure-delete [version]
+  (.closeAndDeleteIfNeeded version))
+
+(defn ensure-deleteo [version]
+  (== nil (ensure-delete version)))
+
 ;;EclipseProject
 
 (defn open [version]

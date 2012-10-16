@@ -1,9 +1,10 @@
 (ns scrapperplugin.clj.logic
-  (:refer-clojure :exclude [==])
-  (:use [clojure.core.logic])
-  (:use scrapperplugin.clj.reification)
-  (:use scrapperplugin.clj.mli)
-  (:use damp.ekeko.workspace.reification)
+  (:refer-clojure :exclude [== type])
+  (:use [clojure.core.logic :as logic])
+  (:use [scrapperplugin.clj.reification :as reification] )
+  (:use [scrapperplugin.clj.mli :as mli])
+  (:use [damp.ekeko.workspace.reification :as workspace])
+  (:require [damp.ekeko.jdt.reification :as jdt])
   (:use damp.qwal))
 
 
@@ -75,6 +76,7 @@
      (let [~result (do ~@body)]
        (close-session *current-session*)
        ~result))))
+
 
 
 (defmacro scurrent [[version] & goals]

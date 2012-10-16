@@ -21,4 +21,10 @@ public class HistoryProjectModelFactory implements IProjectModelFactory{
 		return result;
 	}
 
+	@Override
+	public Collection<IProjectModelFactory> conflictingFactories(IProject p,
+			Collection<IProjectModelFactory> applicableFactories) {
+		return new ArrayList<IProjectModelFactory>();
+	}
+
 }

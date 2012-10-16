@@ -16,6 +16,10 @@
         classes))
     (.accept ast collector)
     (seq (.getCollected collector))))
+
+(defn in-anonymous-class [ast]
+  (not (nil?
+         (loop-parents org.eclipse.jdt.core.dom.AnonymousClassDeclaration ast))))
     
     
 
@@ -50,13 +54,15 @@
 (defn same-method [methdecl var]
   (let [typedecl (get-type-class methdecl)
         package (get-package methdecl)]
-    (logic/fresh [?vtypedecl]
-           (same typedecl ?vtypedecl)
-           (logic/project [?vtypedecl]
-                          (logic/membero var
-                                         (collect-nodes ?vtypedecl
-                                                        org.eclipse.jdt.core.dom.MethodDeclaration)))
-           (logic/== var methdecl))))
+    (if-not (in-anonymous-class methdecl)
+      (logic/fresh [?vtypedecl]
+                   (same typedecl ?vtypedecl)
+                   (logic/project [?vtypedecl]
+                                  (logic/membero var
+                                                 (collect-nodes ?vtypedecl
+                                                                org.eclipse.jdt.core.dom.MethodDeclaration)))
+                   (logic/== var methdecl))
+      logic/fail)))
   
 
 (extend-protocol ISameEntity
@@ -73,6 +79,10 @@
   (same [entity lvar]
         (logic/project [entity]
                        (same entity lvar))))
+
+
+
+
 
 
 ;;Derivates of the previous two protocols

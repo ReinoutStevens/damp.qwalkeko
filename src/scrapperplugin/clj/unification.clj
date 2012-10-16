@@ -16,10 +16,11 @@
 ;;helpers
 (defn loop-parents [class instance]
   (loop [curr instance]
-    (when-not (nil? instance)
+    (if-not (nil? curr)
       (if (instance? class curr)
         curr
-        (recur (.getParent curr))))))
+        (recur (.getParent curr)))
+      nil)))
 
 
 (defn get-compilation-unit [ast]

@@ -1,14 +1,16 @@
-(ns scrapperplugin.clj.protocols
+(ns qwalkeko.clj.astnodes
   (:require [clojure.core.logic :as logic])
   (:require [damp.ekeko.jdt.reification :as jdt])
   (:require [damp.qwal :as qwal])
-  (:use [scrapperplugin.clj.unification])
-  (:use [scrapperplugin.clj.logic]))
+  (:use [qwalkeko.clj.unification])
+  (:use [qwalkeko.clj.reification])
+  (:use [qwalkeko.clj.sessions])
+  (:use [qwalkeko.clj.logic]))
 
 
 
 (defn collect-nodes [ast & classes]
-  (let [collector (new scrapperplugin.ASTCollector)]
+  (let [collector (new qwalkeko.ASTCollector)]
     (doall
       (map
         (fn [x]
@@ -21,7 +23,29 @@
   (not (nil?
          (loop-parents org.eclipse.jdt.core.dom.AnonymousClassDeclaration ast))))
     
+
+;; Guessing whether a node changed or not
+;; Currently we just see whether the defining file changed
+(defn defining-path [ast]
+  (let [comp-unit (loop-parents org.eclipse.jdt.core.dom.CompilationUnit ast)
+        java-element (.getJavaElement comp-unit)
+        path (.getPath java-element)]
+    path))
+
+
+(defn could-have-changed? [node]
+  (let [defining-p (defining-path node)
+        current (current-version)]
+    (file-changed? defining-p current)))  
+                          
     
+
+
+
+
+
+;; Protocols
+
 
 
 (defprotocol ISameEntity
@@ -81,20 +105,25 @@
                        (same entity lvar))))
 
 
-
-
-
-
 ;;Derivates of the previous two protocols
 
-(defn introduced? [entity]
-  (fn [graph current next]
-    (logic/fresh [?preventity ?kind]
-                 (qwal/solve-all-goals graph current next
-                                  (scurrent [curr]
-                                            (jdt/ast ?kind entity))
-                                  qwal/q<=
-                                  (scurrent [curr]
-                                            (damp.ekeko.logic/fails
-                                              (same entity ?preventity))))
-                 (logic/== current next))))
+(defn sis-introduced [entity]
+  (fn [graph current end]
+    (logic/fresh [?prev-entity ?kind ?next]
+                 (qwal/solve-goals
+                   graph current ?next
+                   (seq
+                     (list 
+                       (scurrent [curr]
+                                 (jdt/ast ?kind entity))
+                       qwal/q<=
+                       (scurrent [curr]
+                                 (damp.ekeko.logic/fails
+                                   (same entity ?prev-entity))))))
+                 (logic/== current end))))
+
+
+(defn is-removed [entity]
+  (damp.ekeko.logic/fails
+    (logic/fresh [other-entity]
+           (same entity other-entity))))

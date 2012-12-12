@@ -1,9 +1,9 @@
-(ns scrapperplugin.clj.reification
+(ns qwalkeko.clj.reification
   (:refer-clojure :exclude [==])
   (:use [clojure.core.logic])
-  (:use [scrapperplugin.clj mli])
+  (:use [damp.ekeko.ekekomodel :as model])
   (:import
-    [scrapperplugin HistoryProjectModel]))
+    [qwalkeko HistoryProjectModel]))
 
 
 (defmacro with-metaproject [project-model [metaproject] & body]
@@ -13,6 +13,14 @@
 (defmacro with-eclipseproject [version [eclipse] & body]
   `(let [~eclipse (.getEclipseProject ~version)]
      ~@body))
+
+
+(defn history-project-models []
+  (filter (fn [project-model]
+            (instance? HistoryProjectModel project-model))
+       (model/queried-project-models)))
+
+
 
 ;;HistoryProject
 (defn versions [^HistoryProjectModel project-model]
@@ -49,14 +57,9 @@
 (defn ensure-checkout [version]
   (.openAndCheckoutIfNeeded version))
 
-(defn ensure-checkouto [version]
-  (== nil (ensure-checkout version)))
-
 (defn ensure-delete [version]
   (.closeAndDeleteIfNeeded version))
 
-(defn ensure-deleteo [version]
-  (== nil (ensure-delete version)))
 
 ;;EclipseProject
 
@@ -73,4 +76,26 @@
 
 (defn close-all [project-model]
   (map close (versions project-model)))
+
+
+;;Changed Files
+(defn file-infos [version]
+  (seq (.getChangedFileInfos version)))
+
+
+(defn file-info-changed? [changedfileinfo]
+  (.hasChanged changedfileinfo))
+
+
+(defn changed-file-infos [version]
+  (filter file-info-changed? (file-infos version)))
+
+(defn file-changed? [path version]
+  (let [infos (file-infos version)
+        names (map #(.getFileName %) infos)
+        ;;path contains the project name as well, which we have to ignore
+        cutted-path (.toString (.removeFirstSegments path 1))]
+    (some #(= cutted-path %) names)))
+    
+         
 

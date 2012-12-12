@@ -5,38 +5,38 @@
 	         point="org.eclipse.ui.popupMenus">
 	      <objectContribution
 	            adaptable="true"
-	            id="ScrapperPlugin.addNatureIProjectContribution"
+	            id="QwalKeko.addNatureIProjectContribution"
 	            nameFilter="*"
 	            objectClass="org.eclipse.core.resources.IProject">
 	         
 	      <action
-	           class="scrapperplugin.ToggleHistoryNatureAction"
-	           id="ScrapperPlugin.AddNatureAction"
+	           class="qwalkeko.ToggleHistoryNatureAction"
+	           id="QwalKeko.AddNatureAction"
 	           label="Add History Nature"
 	            menubarPath="org.eclipse.ui.projectConfigure/additions">
 	      </action>
 	
 	
 	       <visibility>
-	          <not><objectState name="nature" value="scrapperplugin.historyNature" /></not>
+	          <not><objectState name="nature" value="qwalkeko.historyNature" /></not>
 	       </visibility>
 	
 	      </objectContribution>
 	      
 	       <objectContribution
 	            adaptable="true"
-	            id="ScraperPlugin.removeNatureIProjectContribution"
+	            id="QwalKeko.removeNatureIProjectContribution"
 	            nameFilter="*"
 	            objectClass="org.eclipse.core.resources.IProject">
 	         <action
-	               class="scrapperplugin.ToggleHistoryNatureAction"
-	               id="ScrapperPlugin.RemoveNatureAction"
+	               class="qwalkeko.ToggleHistoryNatureAction"
+	               id="QwalKeko.RemoveNatureAction"
 	               label="Remove History Nature"
 	               menubarPath="org.eclipse.ui.projectConfigure/additions">
 	         </action>
 	
 	       <visibility>
-	          <objectState name="nature" value="scrapperplugin.historyNature" />
+	          <objectState name="nature" value="qwalkeko.historyNature" />
 	       </visibility>	
 		</objectContribution>
    </extension>
@@ -47,11 +47,11 @@
 	         point="org.eclipse.core.resources.natures">
 	      <runtime>
 	         <run
-	               class="scrapperplugin.HistoryNature">
+	               class="qwalkeko.HistoryNature">
 	         </run>
 	      </runtime>
 	      <builder
-	      	id="scrapperplugin.historyBuilder" >
+	      	id="qwalkeko.historyBuilder" >
 	      </builder>
 	</extension>
 	
@@ -62,13 +62,13 @@
       <builder
             hasNature="true">
          <run
-               class="scrapperplugin.HistoryBuilder">
+               class="qwalkeko.HistoryBuilder">
          </run></builder>
    </extension>
  <extension
        point="ekeko.projectModelFactory">
     <contributedFactory
-          factory="scrapperplugin.HistoryProjectModelFactory">
+          factory="qwalkeko.HistoryProjectModelFactory">
     </contributedFactory>
  </extension>
 

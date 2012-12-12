@@ -1,4 +1,4 @@
-package scrapperplugin;
+package qwalkeko;
 
 public class SessionUnboundException extends Exception {
 

@@ -1,4 +1,4 @@
-package scrapperplugin.parser;
+package qwalkeko.parser;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -14,8 +14,9 @@ import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.DefaultHandler;
 import org.xml.sax.helpers.XMLReaderFactory;
 
-import scrapperplugin.MetaProject;
-import scrapperplugin.MetaVersion;
+import qwalkeko.MetaProject;
+import qwalkeko.MetaVersion;
+
 
 public class ScrapperHandler extends DefaultHandler {
 
@@ -65,6 +66,8 @@ public class ScrapperHandler extends DefaultHandler {
 			this.beginSuccessor(uri, name, qName, atts);
 		} else if(name.equals("time")){
 			this.beginTime(uri, name, qName, atts);
+		} else if(name.equals("changed")){
+			this.beginChanged(uri, name, qName, atts);
 		}
 		
 	}
@@ -120,6 +123,12 @@ public class ScrapperHandler extends DefaultHandler {
 		currentVersion.parseTime(uri, name, qName, atts);
 	}
 	
+	private void beginChanged(String uri, String name, String qName, Attributes atts) throws SAXException{
+		if(currentVersion == null){
+			throw new SAXParseException("unexpected changed", locator);
+		}
+		currentVersion.parseChangedFile(uri, name, qName, atts);
+	}
 	
 	private void endProject() throws SAXException {
 		this.project = currentProject.createProject();

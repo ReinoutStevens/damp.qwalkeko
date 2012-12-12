@@ -1,4 +1,4 @@
-package scrapperplugin;
+package qwalkeko;
 
 import java.io.File;
 import java.io.IOException;
@@ -12,7 +12,8 @@ import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 import org.xml.sax.SAXException;
 
-import scrapperplugin.parser.ScrapperHandler;
+import qwalkeko.parser.ScrapperHandler;
+
 
 import damp.ekeko.EkekoNature;
 import damp.ekeko.ProjectModel;

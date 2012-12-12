@@ -1,4 +1,4 @@
-package scrapperplugin;
+package qwalkeko;
 
 import java.io.File;
 import java.io.IOException;
@@ -41,6 +41,7 @@ public class MetaProject {
 	private Collection<MetaVersion> roots;
 	private IProject eclipseProject;
 	
+		
 	public MetaProject(String name, URI url){
 		this.name = name;
 		this.uri = url;

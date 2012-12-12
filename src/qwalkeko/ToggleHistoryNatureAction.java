@@ -1,4 +1,4 @@
-package scrapperplugin;
+package qwalkeko;
 
 import java.util.Iterator;
 

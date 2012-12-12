@@ -1,5 +1,5 @@
-(ns scrapperplugin.clj.unification
-  (:use scrapperplugin.clj.logic)
+(ns qwalkeko.clj.unification
+  (:use qwalkeko.clj.logic)
   (:require [clojure.core.logic :as logic])
   (:require [damp.ekeko.jdt.reification :as jdt]))
  

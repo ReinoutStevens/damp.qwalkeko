@@ -1,4 +1,4 @@
-package scrapperplugin.parser;
+package qwalkeko.parser;
 
 import java.io.IOException;
 import java.net.URI;
@@ -10,8 +10,9 @@ import org.eclipse.core.runtime.CoreException;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 
-import scrapperplugin.MetaProject;
-import scrapperplugin.MetaVersion;
+import qwalkeko.MetaProject;
+import qwalkeko.MetaVersion;
+
 
 public class MetaProjectHandler {
 	private String name;

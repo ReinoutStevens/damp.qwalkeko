@@ -1,4 +1,4 @@
-package scrapperplugin;
+package qwalkeko;
 
 import java.io.File;
 import java.io.IOException;
@@ -45,6 +45,9 @@ public class MetaVersion {
 
 	private Collection<String> successorRevisions;
 	private Collection<String> predecessorRevisions;
+	private Collection<ChangedFileInfo> changedFiles;
+	
+	
 	private String commitMessage;
 	private String author;
 	private Calendar time;
@@ -53,6 +56,11 @@ public class MetaVersion {
 	private IProject eclipseProject;
 	private Git versionRepository;
 	
+	public static String retrieveRevisionNoFromProject(IProject project){
+		String name = project.getName();
+		int idx = name.lastIndexOf("-");
+		return name.substring(idx + 1);
+	}
 	
 	public MetaVersion(String revNo, String commitMessage, String author, Calendar time){
 		this.revisionNumber = revNo;
@@ -62,6 +70,7 @@ public class MetaVersion {
 		this.author = author;
 		this.time = time;
 		this.metaProject = null;
+		this.changedFiles = new ArrayList<ChangedFileInfo>();
 	}
 	
 
@@ -135,15 +144,7 @@ public class MetaVersion {
 		}
 	}
 	
-	public void checkout() throws JGitInternalException, CoreException, CheckoutConflictException, GitAPIException{
-		this.checkout(null);
-	}
-	
-	public void checkout(IProgressMonitor monitor) throws JGitInternalException, CoreException, CheckoutConflictException, GitAPIException{
 		
-	}
-	
-	
 	public Calendar getTime() {
 		return time;
 	}
@@ -164,6 +165,13 @@ public class MetaVersion {
 	}
 	
 	
+	public Collection<ChangedFileInfo> getChangedFileInfos(){
+		return changedFiles;
+	}
+	
+	public void addChangedFiles(Collection<ChangedFileInfo> changed){
+		this.changedFiles.addAll(changed);
+	}
 	
 	public void openAndCheckoutIfNeeded() throws CoreException{
 		File root = ResourcesPlugin.getWorkspace().getRoot().getLocation().toFile();

@@ -1,4 +1,4 @@
-package scrapperplugin.parser;
+package qwalkeko.parser;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -12,7 +12,10 @@ import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
-import scrapperplugin.MetaVersion;
+import qwalkeko.ChangedFileInfo;
+import qwalkeko.MetaVersion;
+import qwalkeko.ChangedFileInfo.Status;
+
 
 public class MetaVersionHandler {
 
@@ -23,6 +26,9 @@ public class MetaVersionHandler {
 	
 	private Collection<String> successors = new TreeSet<String>();
 	private Collection<String> predecessors = new TreeSet<String>();
+	
+	private Collection<ChangedFileInfo> changedFiles = new ArrayList<ChangedFileInfo>();
+
 	
 	
 	
@@ -100,6 +106,21 @@ public class MetaVersionHandler {
 		predecessors.add(revNo);
 	}
 	
+	
+	public void parseChangedFile(String uri, String name, String qName, Attributes atts) throws SAXException{
+		int fileIdx = atts.getIndex(uri, "file");
+		int typeIdx = atts.getIndex(uri, "type");
+		if(fileIdx == -1){
+			throwException("file");
+		}	
+		if(fileIdx == -1){
+			throwException("type");
+		}
+		String fileName = atts.getValue(fileIdx);
+		ChangedFileInfo.Status status = Status.valueOf(atts.getValue(typeIdx).toUpperCase());
+		changedFiles.add(new ChangedFileInfo(fileName, status));
+	}
+	
 	public MetaVersion createVersion() throws SAXException{ 
 		if(revision == null || commitMessage == null || author == null || time == null){
 			throw new SAXException("invalid version");
@@ -107,6 +128,7 @@ public class MetaVersionHandler {
 		MetaVersion version = new MetaVersion(revision, commitMessage, author, time);
 		version.addSuccessors(successors);
 		version.addPredecessors(predecessors);
+		version.addChangedFiles(changedFiles);
 		return version;
 		
 	}

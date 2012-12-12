@@ -1,4 +1,4 @@
-package scrapperplugin;
+package qwalkeko;
 
 import java.util.Map;
 
@@ -9,7 +9,7 @@ import org.eclipse.core.runtime.IProgressMonitor;
 
 public class HistoryBuilder extends IncrementalProjectBuilder {
 
-	public static final String BUILDER_ID = "scrapperplugin.historyBuilder";
+	public static final String BUILDER_ID = "qwalkeko.historyBuilder";
 	
 	@Override
 	protected IProject[] build(int kind, Map<String, String> args,

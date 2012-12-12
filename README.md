@@ -1,4 +1,6 @@
 # damp.scrapperplugin
 
-The ScrapperPlugin extends [Ekeko](https://github.com/cderoove/damp.ekeko), allowing people to reason over Java projects stored in a Version Control System.
-The project is still in development, so prepare for a bumpy road if you do decide to try it out.
+The ScrapperPlugin extends [Ekeko](https://github.com/cderoove/damp.ekeko), allowing developers and researchers to import and query projects stored in a VCS.
+First of all, this is a research artifact, and is subject to breaking changes, bugs, incorrectness etc.
+
+

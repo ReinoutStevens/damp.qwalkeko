@@ -10,6 +10,7 @@
 
 
 (defn collect-nodes [ast & classes]
+  "Collects all the nodes in the ast tree that are an instance of the given types"
   (let [collector (new qwalkeko.ASTCollector)]
     (doall
       (map
@@ -20,6 +21,7 @@
     (seq (.getCollected collector))))
 
 (defn in-anonymous-class [ast]
+  "Returns whether the ast is inside an anonymous class"
   (not (nil?
          (loop-parents org.eclipse.jdt.core.dom.AnonymousClassDeclaration ast))))
     
@@ -27,21 +29,26 @@
 ;; Guessing whether a node changed or not
 ;; Currently we just see whether the defining file changed
 (defn defining-path [ast]
+  "Returns the path to the file in which the ast node is defined"
   (let [comp-unit (loop-parents org.eclipse.jdt.core.dom.CompilationUnit ast)
         java-element (.getJavaElement comp-unit)
         path (.getPath java-element)]
     path))
 
 
+(defn defining-project [ast]
+  "Returns the java project in which the ast node is defined"
+  (let [comp-unit (loop-parents org.eclipse.jdt.core.dom.CompilationUnit ast)
+        java-element (.getJavaElement comp-unit)
+        java-project (.getJavaProject java-element)]
+    java-project))
+
+
 (defn could-have-changed? [node]
+  "Returns whether the node may have changed."
   (let [defining-p (defining-path node)
         current (current-version)]
     (file-changed? defining-p current)))  
-                          
-    
-
-
-
 
 
 ;; Protocols

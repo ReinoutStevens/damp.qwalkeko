@@ -12,26 +12,35 @@
 ;;Declarative layer on top of reification
 ;;Can probably be sped up a bit
 (defn rooto [root]
+  "Logic goal that unifies root with a root version"
   (all
     (membero root (all-roots))))
 
 (defn versiono [version]
+  "Logic goal that unifies version with a metaversion"
   (all
     (membero version (all-versions))))
 
 
 (defn endversiono [version]
+  "Logic goal that unifies version with an endversion"
   (all
     (versiono version)
     (project [version]
-             (== true (endversion? version)))))
+      (== true (endversion? version)))))
 
 
 (defn ensure-checkouto [version]
-  (== nil (ensure-checkout version)))
+  "Logic goals that checks out the given version.
+   Version must be grounded."
+  (project [version]
+    (== nil (ensure-checkout version))))
 
 (defn ensure-deleteo [version]
-  (== nil (ensure-delete version)))
+  "Logic goal that deletes the given version.
+   Version must be grounded"
+  (project [version]
+    (== nil (ensure-delete version))))
 
 
 ;;QWAL and Logic
@@ -47,12 +56,7 @@
   {:predecessors predecessoro
    :successors successoro
    :project project-model
-   :goal-solver
-   (fn [graph current next goal]
-     (binding [damp.ekeko.ekekomodel/*queried-project-models* current]
-       (all
-         (goal graph current next))))})
-
+   })
 
 (defn qendversiono [graph start end]
   (all
@@ -65,6 +69,5 @@
     (== start end)))
 
 (defn current-version []
-  damp.ekeko.ekekomodel/*queried-project-models*)
-
+  (damp.ekeko.ekekomodel/queried-project-models))
    

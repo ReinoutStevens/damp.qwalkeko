@@ -1,6 +1,7 @@
 (ns qwalkeko.clj.sessions
   (:refer-clojure :exclude [==])
   (:use [clojure.core.logic :as logic])
+  (:use [qwalkeko.clj.logic])
   (:use [qwalkeko.clj.reification :as reification]))
  
 
@@ -49,14 +50,13 @@
                    (list (.getJavaProjectModel (damp.ekeko.EkekoModel/getInstance) (.getEclipseProject version)))))
           true))))
 
-
-
+                      
 
 (defmacro vcurrent [[version] & goals]
   "Opens and sets the current version, and will evaluate all the goals in the current version.
 
   To ensure that the goals are always evaluated in the correct version (for example when backtracking) an additional
-  conde is added to the end that resets the current version."
+  goal is added to the end that resets the current version."
   `(fn [graph# ~version next#]
      (logic/project [~version]
                     (all
@@ -64,14 +64,9 @@
                       (ensure-checkouto ~version)
                       ~@goals
                       (logic/== ~version next#)
-                      ;;by first succeeding we just "skip" this conde
-                      ;;when backtracking the alternative branch will be tried, restoring the current version
-                      ;;as we immediately fail we will try other solutions for the provided goals
-                      ;;these may provide new solutions, and we repeat the above structure.
-                      (conde [logic/succeed]
-                             [(set-current ~version)
-                              logic/fail])))))
-     
-                            
-                      
-                      
+                      ;;we directly create a core.logic goal that just returns the substitutions
+                      ;;as a sideeffect we restore the current version, used upon backtracking
+                      ;;when you get weird results, start looking here :)
+                      (fn [subs#]
+                        (qwalkeko.clj.sessions/set-current ~version)
+                        subs#)))))

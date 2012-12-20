@@ -113,23 +113,6 @@
 
 
 ;;Derivates of the previous two protocols
-
-(defn sis-introduced [entity]
-  (fn [graph current end]
-    (logic/fresh [?prev-entity ?kind ?next]
-                 (qwal/solve-goals
-                   graph current ?next
-                   (seq
-                     (list 
-                       (scurrent [curr]
-                                 (jdt/ast ?kind entity))
-                       qwal/q<=
-                       (scurrent [curr]
-                                 (damp.ekeko.logic/fails
-                                   (same entity ?prev-entity))))))
-                 (logic/== current end))))
-
-
 (defn is-removed [entity]
   (damp.ekeko.logic/fails
     (logic/fresh [other-entity]

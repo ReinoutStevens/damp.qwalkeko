@@ -1,6 +1,6 @@
-(ns scrapperplugin.clj.refactorings
+(ns qwalkeko.clj.refactorings
   (:require [qwalkeko.clj.logic])
-  (:use [qwalkeko.clj.protocols])
+  (:use [qwalkeko.clj.astnodes])
   (:require [clojure.core.logic :as logic])
   (:require [damp.ekeko.jdt.reification :as jdt])
   (:require [damp.qwal :as qwal]))
@@ -34,6 +34,8 @@ t2FullName)
         (org.apache.commons.lang.StringUtils/getLevenshteinDistance filtered1 filtered2)
         (max (count filtered1) (count filtered2))))))
 
+;;TODO
+(comment
 (defn has-similar-body 
   ([method1 method2]
    (has-similar-body method1 method2 (/ 9 10)))
@@ -42,7 +44,10 @@ t2FullName)
             (logic/== true
                 (<= (compare-strings (.toString (.getBody method1))
                                      (.toString (.getBody method2)))
-                    tolerance)))))
+                    tolerance))))))
+
+(defn has-similar-body [method1 method2]
+  (logic/all logic/succeed))
 
 
 
@@ -79,7 +84,10 @@ t2FullName)
                          (.getDeclaringClass (.resolveBinding ?pulled))))))
 
 
-(run* [?method ?pulled]
+
+
+(comment 
+  (run* [?method ?pulled]
   (fresh [?end]
     (qwal graph root ?end []
       (q=>*) ;;skip arbitrary no versions
@@ -89,9 +97,7 @@ t2FullName)
       (qcurrent [curr]
         (ast :MethodDeclaration ?pulled)
         (pulled-up ?method ?pulled)))))
-
-(comment 
-(defn working-together [?authorA ?authorB]
+  (defn working-together [?authorA ?authorB]
               (logic/fresh [ ?end ?authorA ?authorB]
                            (qwal/qwal graph root ?end []
                                       (qwal/q=>*)
@@ -102,10 +108,8 @@ t2FullName)
                                                 (qwal/qcurrent [curr]
                                                               (logic/== ?authorB (.getAuthor curr)))
                                                 qwal/q=>))
-                    (logic/== ?authors (list ?authorA ?authorB)))))
-
-
-
+                    (logic/== ?authors (list ?authorA ?authorB))))
+  
 (logic/run* [?methodA ?methodB]
             (fresh [?end]
                    (qwal graph root ?end []
@@ -115,4 +119,6 @@ t2FullName)
                          (qcurrent [curr]
                                    (ast :MethodDeclaration ?methodB)
                                    (fails
-                                     (same ?methodA ?methodB))))))
+                                     (same ?methodA ?methodB)))))))
+
+

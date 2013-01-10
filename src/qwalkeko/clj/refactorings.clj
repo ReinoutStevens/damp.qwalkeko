@@ -46,6 +46,14 @@ t2FullName)
                                      (.toString (.getBody method2)))
                     tolerance))))))
 
+(defmacro refactoring [ & goals ]
+  `(fn [graph# current# next#]
+     (logic/fresh [end#]
+       (qwal/solve-goals graph# current# end#
+                         (seq (list ~@goals)))
+       (logic/== current# next#))))
+
+
 (defn has-similar-body [method1 method2]
   (logic/all logic/succeed))
 
@@ -53,11 +61,13 @@ t2FullName)
 
 
 (defn method-moved [?moved ?to]
-  (logic/all
-    (is-removed ?moved)
-    (jdt/ast :MethodDeclaration ?to)
-    (logic/== ?moved ?to) ;;same signature
-    (has-similar-body ?moved ?to)))
+  (refactoring
+    (qwalkeko.clj.sessions/vcurrent [curr]
+      (qwalkeko.clj.astnodes/is-removed ?moved)
+      (jdt/ast :MethodDeclaration ?to)
+      (logic/== ?moved ?to) ;;same signature
+      (has-similar-body ?moved ?to))
+    (qwalkeko.clj.astnodes/is-introduced ?to)))
 
 
 (defn superclass [?class ?super]

@@ -48,7 +48,7 @@
   "Returns whether the node may have changed."
   (let [defining-p (defining-path node)
         current (current-version)]
-    (file-changed? defining-p current)))  
+    (file-changed? defining-p current)))
 
 
 ;; Protocols
@@ -114,6 +114,21 @@
 
 ;;Derivates of the previous two protocols
 (defn is-removed [entity]
+  "Succeeds when the entity is no longer present in the current version."
   (damp.ekeko.logic/fails
     (logic/fresh [other-entity]
            (same entity other-entity))))
+
+
+
+(defn is-introduced [entity]
+  "Succeeds when the entity was not present in any of the predecessors."
+  ;;a bit harder than is-removed
+  (fn [graph current next]
+    (let [goals (seq (list qwal/q<= (vcurrent [curr]
+                                         (logic/fresh [other-entity]
+                                                      (damp.ekeko.logic/fails
+                                                        (same entity other-entity))))))]
+      (logic/fresh [end]
+        (qwal/solve-goals graph current end goals)
+        (logic/== current next)))))

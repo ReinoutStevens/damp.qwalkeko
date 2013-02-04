@@ -13,29 +13,6 @@
        false)
     `(do ~@body)))
 
-;;helpers
-(defn loop-parents [class instance]
-  (loop [curr instance]
-    (if-not (nil? curr)
-      (if (instance? class curr)
-        curr
-        (recur (.getParent curr)))
-      nil)))
-
-
-(defn get-compilation-unit [ast]
-  (loop-parents org.eclipse.jdt.core.dom.CompilationUnit ast))
-
-(defn get-package [ast]
-  (.getPackage
-    (get-compilation-unit ast)))
-
-
-
-
-(defn get-type-class [ast]
-  (loop-parents org.eclipse.jdt.core.dom.TypeDeclaration ast))
-
 
 ;;macros because I got tired of copy pasting it
 (defmacro generate-unification [class vars & body ]

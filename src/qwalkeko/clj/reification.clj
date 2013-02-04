@@ -95,7 +95,5 @@
         names (map #(.getFileName %) infos)
         ;;path contains the project name as well, which we have to ignore
         cutted-path (.toString (.removeFirstSegments path 1))]
-    (some #(= cutted-path %) names)))
-    
-         
+    (some #(= cutted-path %) names)))         
 

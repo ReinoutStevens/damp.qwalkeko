@@ -9,6 +9,31 @@
 
 
 
+;;helpers
+(defn loop-parents [class instance]
+  (loop [curr instance]
+    (if-not (nil? curr)
+      (if (instance? class curr)
+        curr
+        (recur (.getParent curr)))
+      nil)))
+
+
+(defn get-compilation-unit [ast]
+  (loop-parents org.eclipse.jdt.core.dom.CompilationUnit ast))
+
+(defn get-package [ast]
+  (.getPackage
+    (get-compilation-unit ast)))
+
+
+
+
+(defn get-type-class [ast]
+  (loop-parents org.eclipse.jdt.core.dom.TypeDeclaration ast))
+
+
+
 (defn collect-nodes [ast & classes]
   "Collects all the nodes in the ast tree that are an instance of the given types"
   (let [collector (new qwalkeko.ASTCollector)]
@@ -94,22 +119,33 @@
                                                                 org.eclipse.jdt.core.dom.MethodDeclaration)))
                    (logic/== var methdecl))
       logic/fail)))
+
+
+(defn same-var [vardecl var]
+  (let [ivarbinding (.resolveBinding vardecl)
+        declaring-method (.getDeclaringMethod ivarbinding)
+        declaring-class (.getDeclaringClass ivarbinding)]
+    
+    ))
   
 
 (extend-protocol ISameEntity
   org.eclipse.jdt.core.dom.PackageDeclaration
   (same [entity lvar]
-                 (same-package entity lvar))
+    (same-package entity lvar))
   org.eclipse.jdt.core.dom.TypeDeclaration
   (same [entity lvar]
-                 (same-type entity lvar))
+    (same-type entity lvar))
   org.eclipse.jdt.core.dom.MethodDeclaration
   (same [entity lvar]
-                 (same-method entity lvar))
+    (same-method entity lvar))
+  org.eclipse.jdt.core.dom.VariableDeclaration
+  (same [entity lvar]
+    (same-var entity lvar))
   clojure.core.logic.LVar
   (same [entity lvar]
-        (logic/project [entity]
-                       (same entity lvar))))
+    (logic/project [entity]
+                   (same entity lvar))))
 
 
 ;;Derivates of the previous two protocols

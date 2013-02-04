@@ -2,7 +2,8 @@
   (:refer-clojure :exclude [==])
   (:use [clojure.core.logic :as logic])
   (:use [qwalkeko.clj.logic])
-  (:use [qwalkeko.clj.reification :as reification]))
+  (:use [qwalkeko.clj.reification :as reification])
+  (:use [damp.ekeko.workspace.projectmodel :as projectmodel]))
  
 
 (def ^:dynamic *current-session*)
@@ -50,7 +51,7 @@
                    (list (.getJavaProjectModel (damp.ekeko.EkekoModel/getInstance) (.getEclipseProject version)))))
           true))))
 
-                      
+
 
 (defmacro vcurrent [[version] & goals]
   "Opens and sets the current version, and will evaluate all the goals in the current version.

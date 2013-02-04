@@ -37,6 +37,7 @@ import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 
 import damp.ekeko.EkekoNature;
+import damp.keko.PPAJavaNature;
 
 //look at ProjectNature
 public class MetaVersion {
@@ -243,6 +244,7 @@ public class MetaVersion {
 		return versionRepository;
 	}
 	
+	
 	private void initGitRepository() throws IOException{
 		String location = new File(getVersionRepositoryLocation(), ".git").toString();
 		Repository repo = new FileRepository(location);
@@ -266,6 +268,9 @@ public class MetaVersion {
 			}
 			if(!eclipseProject.hasNature(EkekoNature.NATURE_ID)){
 				damp.util.Natures.addNature(eclipseProject, EkekoNature.NATURE_ID);
+			}
+			if(!eclipseProject.hasNature(PPAJavaNature.NATURE_ID)){
+				damp.util.Natures.addNature(eclipseProject, PPAJavaNature.NATURE_ID);
 			}
 		} catch(CoreException e){
 			e.printStackTrace();

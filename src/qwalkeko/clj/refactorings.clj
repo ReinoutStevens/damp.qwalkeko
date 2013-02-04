@@ -2,6 +2,7 @@
   (:require [qwalkeko.clj.logic])
   (:use [qwalkeko.clj.astnodes])
   (:require [clojure.core.logic :as logic])
+  (:require [qwalkeko.clj.sessions :as sessions])
   (:require [damp.ekeko.jdt.reification :as jdt])
   (:require [damp.qwal :as qwal]))
  
@@ -25,6 +26,7 @@ t2FullName)
 
                  
 
+;;Helpers
 (defn compare-strings [str1 str2]
   (let [regexstr "\\s"
         filtered1 (.replaceAll str1 regexstr "")
@@ -56,8 +58,6 @@ t2FullName)
 
 (defn has-similar-body [method1 method2]
   (logic/all logic/succeed))
-
-
 
 
 (defn method-moved [?moved ?to]
@@ -95,6 +95,20 @@ t2FullName)
 
 
 
+;;
+(defn trace [?entity ?to]
+  (sessions/vcurrent [curr] 
+            (logic/conde [(pulled-up ?entity ?to)])))
+
+
+(defn trace-forward [?entity ?to]
+  (logic/fresh [?other]
+         (refactoring
+           (qwal/q+
+             (trace ?entity ?other)
+             qwal/q=>
+             (trace-forward ?other ?to)))))
+
 
 (comment 
   (run* [?method ?pulled]
@@ -120,15 +134,15 @@ t2FullName)
                                                 qwal/q=>))
                     (logic/== ?authors (list ?authorA ?authorB))))
   
-(logic/run* [?methodA ?methodB]
-            (fresh [?end]
-                   (qwal graph root ?end []
-                         (qcurrent [curr]
-                                   (ast :MethodDeclaration ?methodA))
-                         q=>
-                         (qcurrent [curr]
-                                   (ast :MethodDeclaration ?methodB)
-                                   (fails
-                                     (same ?methodA ?methodB)))))))
+  (logic/run* [?methodA ?methodB]
+              (fresh [?end]
+                     (qwal graph root ?end []
+                           (qcurrent [curr]
+                                     (ast :MethodDeclaration ?methodA))
+                           q=>
+                           (qcurrent [curr]
+                                     (ast :MethodDeclaration ?methodB)
+                                     (fails
+                                       (same ?methodA ?methodB)))))))
 
 

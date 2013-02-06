@@ -124,10 +124,15 @@
 (defn same-var [vardecl var]
   (let [ivarbinding (.resolveBinding vardecl)
         declaring-method (.getDeclaringMethod ivarbinding)
-        declaring-class (.getDeclaringClass ivarbinding)]
-    
-    ))
-  
+        comp-unit (get-compilation-unit vardecl)
+        declaring-method-node (.findDeclaringNode comp-unit declaring-method)]
+    (logic/fresh [?methoddecl]
+                 (same declaring-method-node ?methoddecl)
+                 (logic/project [?methoddecl]
+                                  (logic/membero var
+                                                 (collect-nodes ?methoddecl
+                                                                org.eclipse.jdt.core.dom.SingleVariableDeclaration)))
+                 (logic/== var vardecl))))  
 
 (extend-protocol ISameEntity
   org.eclipse.jdt.core.dom.PackageDeclaration
@@ -139,7 +144,7 @@
   org.eclipse.jdt.core.dom.MethodDeclaration
   (same [entity lvar]
     (same-method entity lvar))
-  org.eclipse.jdt.core.dom.VariableDeclaration
+  org.eclipse.jdt.core.dom.SingleVariableDeclaration
   (same [entity lvar]
     (same-var entity lvar))
   clojure.core.logic.LVar

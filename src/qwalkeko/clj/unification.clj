@@ -115,4 +115,9 @@
                                  (.getType x))
                                (.parameters mdecl)))]
             s)]
+  [org.eclipse.jdt.core.dom.SingleVariableDeclaration
+   [v vdecl s]
+   (logic/unify s
+                (.getName v)
+                (.getName vdecl))]
   )

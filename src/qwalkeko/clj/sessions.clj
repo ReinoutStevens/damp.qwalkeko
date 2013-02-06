@@ -3,7 +3,8 @@
   (:use [clojure.core.logic :as logic])
   (:use [qwalkeko.clj.logic])
   (:use [qwalkeko.clj.reification :as reification])
-  (:use [damp.ekeko.workspace.projectmodel :as projectmodel]))
+  (:use [damp.ekeko.workspace.projectmodel :as projectmodel])
+  (:use [damp.ekeko.workspace.workspace :as workspace]))
  
 
 (def ^:dynamic *current-session*)
@@ -52,6 +53,9 @@
           true))))
 
 
+(defn wait-for-builds-to-finisho []
+  (all
+    (== nil (workspace/workspace-wait-for-builds-to-finish))))
 
 (defmacro vcurrent [[version] & goals]
   "Opens and sets the current version, and will evaluate all the goals in the current version.
@@ -63,6 +67,7 @@
                     (all
                       (set-current ~version)
                       (ensure-checkouto ~version)
+                      (wait-for-builds-to-finisho)
                       ~@goals
                       (logic/== ~version next#)
                       ;;we directly create a core.logic goal that just returns the substitutions

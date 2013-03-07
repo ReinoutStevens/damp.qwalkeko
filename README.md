@@ -43,7 +43,7 @@ The implementation of the method-moved rule is written in regular core.logic.
 In the second example we are looking for sequences of versions in which two authors commit repeatedly commit one after the other. 
 
 
-````
+````clojure
 (logic/run* [ ?end ?authorA ?authorB]
   (qwal/qwal graph root ?end []
     (qwal/q=>*) ;;skip an arbitrary number of versions

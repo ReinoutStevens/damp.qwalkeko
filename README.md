@@ -73,12 +73,38 @@ You can clone this repository and import it as an Eclipse plugin project. Note t
 
 
 ## Implementation
+QwalKeko is implemented on Clojure, and combines [Qwal](https://github.com/ReinoutStevens/damp.qwal) with [Ekeko](https://github.com/cderoove/damp.ekeko).
+We have opted for Clojure, as it provides high-level functional functions, has a declarative reasoning engine in [core.logic](https://github.com/clojure/core.logic)
+and it is tightly integrated with the JVM. The latter allows us to easily query Eclipse projects and the corresponding JDT models.
 
-TODO :)
+
+### Evaluating statements in a specific version
+QwalKeko provides a way to evaluate expressions in the "current" version, where the current version is specified using Qwal.
+There are some ways to accomplish this:
+
+We could provide an extra argument to the Ekeko-predicates that indicates the version in which the predicate needs to be evaluated.
+The user simply passes the correct version as an argument.
+The advantage of this approach is that the solution is very clean and easy to understand.
+It also adheres to the declarative style, as the solutions of a goal are only dependent on the provided arguments.
+The downside is that the user must always pass the version as an argument, while he already specified the version in Qwal.
+Next, Ekeko is created to reason over a predefined set of projects, and thus these rules do not have a project (in our case version) as argument.
+Automatically converting this would be difficult. Manually duplicating the functionality of Ekeko would just be silly.
+
+
+We have opted for a solution that is harder to implement, but easier for the end user (who, in the end, should not care how the tool works).
+Ekeko provides a dynamic variable to specify what projects are being queried. We have provided a Qwal-goal `vcurrent` similar to `qcurrent`,
+except that it also sets this variable to the current version. This approach works for as long as no backtracking is required.
+Backtracking may result in moving back to a previous version and re-evaluating a goal. This goal would be evaluated in an incorrect version,
+as the dynamic variable is no longer correctly set. In order to solve this issue the goal `vcurrent` also adds a goal which is executed at the end
+of each version (and thus this goal is called first upon backtracking). This goal initially succeeds, but upon backtracking
+(and thus when we presumably come from a different version) it re-sets the dynamic variable and fails, ensuring further backtracking will occur.
+ 
+
 
 
 ## Additional Reading
-This README still has to be improved. We have published papers describing our work using QwalKeko, and prior work using Absinthe (a similar idea implemented in SmallTalk, extending SOUL).
+This README still needs to be improved. We have published papers describing our work using QwalKeko, and prior work using Absinthe (a similar idea implemented in SmallTalk, extending SOUL).
+
 
 * [Reasoning over the Evolution of Source Code using Quantiﬁed Regular Path Expressions](http://soft.vub.ac.be/Publications/2011/vub-soft-tr-11-13.pdf)
 * [A History Querying Tool and its Application to Detect Multi-version Refactorings](http://soft.vub.ac.be/Publications/2013/vub-soft-tr-13-02.pdf)

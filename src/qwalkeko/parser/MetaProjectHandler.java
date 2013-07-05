@@ -26,14 +26,20 @@ public class MetaProjectHandler {
 	
 	public void parseProject(String uri, String name, String qName, Attributes atts) throws SAXException{
 		int nameIdx = atts.getIndex(uri, "name");
-		int urlIdx = atts.getIndex(uri, "url");
 		if(nameIdx == -1){
 			throw new SAXException("missing name attribute for project");
 		}
+		
+		this.name = atts.getValue(nameIdx);
+		
+	}
+	
+	
+	public void parseRepository(String uri, String name, String qName, Attributes atts) throws SAXException{
+		int urlIdx = atts.getIndex(uri, "url");
 		if(urlIdx == -1){
 			throw new SAXException("missing url attribute for project");
 		}
-		this.name = atts.getValue(nameIdx);
 		try {
 			this.uri = new URI(atts.getValue(urlIdx));
 		} catch (URISyntaxException e) {

@@ -143,6 +143,7 @@ public class MetaVersion {
 		if(eclipseProject != null){
 			eclipseProject.delete(true, monitor);
 		}
+		eclipseProject = null;
 	}
 	
 		

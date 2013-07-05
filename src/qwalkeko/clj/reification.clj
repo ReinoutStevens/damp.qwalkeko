@@ -2,12 +2,13 @@
   (:refer-clojure :exclude [==])
   (:use [clojure.core.logic])
   (:use [damp.ekeko.ekekomodel :as model])
+  (:use [damp.ekeko.workspace.projectmodel :as pmodel])
   (:import
     [qwalkeko HistoryProjectModel]))
 
 
 (defmacro with-metaproject [project-model [metaproject] & body]
-  `(let [~metaproject (.getMetaProject ~project-model)]
+  `(let [~metaproject (.getMetaProject (.getMetaProduct ~project-model))]
      ~@body))
 
 (defmacro with-eclipseproject [version [eclipse] & body]
@@ -51,6 +52,14 @@
 (defn predecessors [version]
   (seq (.getPredecessors version)))
 
+
+(defn was-merged [version]
+  (> (count (predecessors version)) 1))
+
+(defn was-branched [version]
+  (> (count (successors version)) 1))
+                           
+
 (defn endversion? [version]
   (.isEndVersion version))
 
@@ -77,7 +86,6 @@
 (defn close-all [project-model]
   (map close (versions project-model)))
 
-
 ;;Changed Files
 (defn file-infos [version]
   (seq (.getChangedFileInfos version)))
@@ -95,5 +103,13 @@
         names (map #(.getFileName %) infos)
         ;;path contains the project name as well, which we have to ignore
         cutted-path (.toString (.removeFirstSegments path 1))]
-    (some #(= cutted-path %) names)))         
+    (some #(= cutted-path %) names)))
+
+
+(defn get-file-name [changedfileinfo]
+  (.getFileName changedfileinfo))
+
+(defn changed-files [version]
+  (map get-file-name 
+       (filter file-info-changed? (file-infos version))))
 

@@ -26,9 +26,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepository;
 
 public class MetaProject {
-	public static final String xmlName = "project.xml";
-	
-	
 	private Git sourceRepository;
 	private Git metaRepository;
 	
@@ -40,7 +37,7 @@ public class MetaProject {
 	private Map<String, MetaVersion> versions;
 	private Collection<MetaVersion> roots;
 	private IProject eclipseProject;
-	
+	private MetaProduct metaProduct;
 		
 	public MetaProject(String name, URI url){
 		this.name = name;
@@ -54,17 +51,14 @@ public class MetaProject {
 		return name;
 	}
 
-
 	public void setName(String name) {
 		this.name = name;
 	}
 
 
-
 	public URI getURI() {
 		return uri;
 	}
-
 
 
 	public void setURI(URI uri) {
@@ -88,15 +82,23 @@ public class MetaProject {
 		return metaRepository;
 	}
 	
+	public void setMetaProduct(MetaProduct metaProduct) {
+		this.metaProduct = metaProduct;
+	}
+	
+	public MetaProduct getMetaProduct(){
+		return this.metaProduct;
+	}
+	
 	public void initialize() throws CoreException{
 		try{
-		this.createEclipseProjects();
-		for(MetaVersion v : versions.values()){
-			v.initialize(this);
-		}
-		this.findAndSetRoots();
-		this.setSourceRepository();
-		this.createMetaRepository();
+			this.createEclipseProjects();
+			for(MetaVersion v : versions.values()){
+				v.initialize(this);
+			}
+			this.findAndSetRoots();
+			this.setSourceRepository();
+			this.createMetaRepository();
 		} catch(Exception e){
 			IStatus status = new Status(IStatus.ERROR, Activator.PLUGIN_ID, e.getMessage(), e);
 			throw new CoreException(status);
@@ -140,6 +142,14 @@ public class MetaProject {
 	}
 	
 	public MetaVersion findVersion(String sha){
+		MetaVersion localResult = findVersionInProject(sha);
+		if(localResult != null){
+			return localResult;
+		}
+		return getMetaProduct().findVersionComingFrom(sha, this);
+	}
+	
+	public MetaVersion findVersionInProject(String sha) {
 		return versions.get(sha);
 	}
 	
@@ -169,4 +179,6 @@ public class MetaProject {
 	private String repositoryDir(){
 		return "repository";
 	}
+
+	
 }

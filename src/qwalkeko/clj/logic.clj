@@ -1,11 +1,11 @@
 (ns qwalkeko.clj.logic
   (:refer-clojure :exclude [== type])
-  (:use [clojure.core.logic :as logic])
-  (:use [qwalkeko.clj.reification :as reification] )
-  (:use [damp.ekeko.workspace.reification :as workspace])
+  (:require [clojure.core.logic :as logic])
+  (:require [qwalkeko.clj.reification :as reification] )
+  (:require [damp.ekeko.workspace.reification :as workspace])
   (:require [damp.ekeko.jdt.reification :as jdt])
   (:import [qwalkeko HistoryProjectModel])
-  (:use damp.qwal))
+  (:require [damp.qwal :as qwal]))
 
 
 
@@ -13,44 +13,56 @@
 ;;Can probably be sped up a bit
 (defn rooto [root]
   "Logic goal that unifies root with a root version"
-  (all
-    (membero root (all-roots))))
+  (logic/all
+    (logic/membero root (all-roots))))
 
 (defn versiono [version]
   "Logic goal that unifies version with a metaversion"
-  (all
-    (membero version (all-versions))))
+  (logic/all
+    (logic/membero version (all-versions))))
 
+
+
+(defn was-branchedo [version]
+  (logic/all
+    (logic/== true (reification/was-branched version))))
+
+
+(defn was-mergedo [version]
+  (logic/all
+    (logic/== true (reification/was-merged version))))
 
 (defn endversiono [version]
   "Logic goal that unifies version with an endversion"
-  (all
+  (logic/all
     (versiono version)
-    (project [version]
-      (== true (endversion? version)))))
+    (logic/project [version]
+      (logic/== true (endversion? version)))))
 
 
 (defn ensure-checkouto [version]
   "Logic goals that checks out the given version.
    Version must be grounded."
-  (project [version]
-    (== nil (ensure-checkout version))))
+  (logic/project [version]
+    (logic/== nil (ensure-checkout version))))
 
 (defn ensure-deleteo [version]
   "Logic goal that deletes the given version.
    Version must be grounded"
-  (project [version]
-    (== nil (ensure-delete version))))
+  (logic/project [version]
+    (logic/== nil (ensure-delete version))))
 
 
 ;;QWAL and Logic
 (defn predecessoro [version pred]
-  (all
-    (== pred (predecessors version))))
+  (logic/all
+    (logic/== pred (reification/predecessors version))))
 
 (defn successoro [version succ]
-  (all
-    (== succ (successors version))))
+  (logic/all
+    (logic/== succ (reification/successors version))))
+
+
 
 (defn make-graph [project-model]
   {:predecessors predecessoro
@@ -59,14 +71,15 @@
    })
 
 (defn qendversiono [graph start end]
-  (all
+  (logic/all
     (endversiono start)
-    (== start end)))
+    (logic/== start end)))
 
 (defn qrooto [graph start end]
-  (all
+  (logic/all
     (rooto start)
-    (== start end)))
+    (logic/== start end)))
+
 
 (defn current-version []
   (damp.ekeko.ekekomodel/queried-project-models))

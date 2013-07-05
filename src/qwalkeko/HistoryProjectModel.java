@@ -20,7 +20,7 @@ import damp.ekeko.ProjectModel;
 
 public class HistoryProjectModel extends ProjectModel {
 
-	private MetaProject metaProject;
+	private MetaProduct metaProduct;
 
 	public HistoryProjectModel(IProject p) {
 		super(p);
@@ -28,17 +28,17 @@ public class HistoryProjectModel extends ProjectModel {
 
 	public void populate(IProgressMonitor monitor) throws CoreException {
 		super.populate(monitor);
-		IFile ifile = getProject().getFile(MetaProject.xmlName);
+		IFile ifile = getProject().getFile(MetaProduct.xmlName);
 		File file = new File(ifile.getLocationURI());
 		if (!file.exists()) {
 			IStatus status = new Status(Status.ERROR, "ScrapperPlugin",
-					"missing project file " + MetaProject.xmlName);
+					"missing project file " + MetaProduct.xmlName);
 			throw new CoreException(status);
 		}
 		try {
 			ScrapperHandler handler = ScrapperHandler.parseFile(file);
-			metaProject = handler.getMetaProject();
-			if (metaProject == null) {
+			metaProduct = handler.getMetaProduct();
+			if (metaProduct == null) {
 				// something went wrong
 				IStatus status = new Status(Status.ERROR, "ScrapperPlugin",
 						"something went wrong parsing the file");
@@ -56,25 +56,28 @@ public class HistoryProjectModel extends ProjectModel {
 		System.out.println("Populated history model for project: "
 				+ getProject().getName());
 		//addEkekoNatures();
-		System.out.println("Added ekekko natures to all versions");
+		//System.out.println("Added ekekko natures to all versions");
 	}
 
 	public void clean() {
 		super.clean();
-		this.metaProject = null;
+		this.metaProduct = null;
 	}
 
-	public MetaProject getMetaProject() {
-		return metaProject;
+	public MetaProduct getMetaProduct() {
+		return metaProduct;
 	}
 	
+	@SuppressWarnings("unused")
 	private void addEkekoNatures() throws CoreException{
-		for(MetaVersion v : metaProject.getVersions()){
-			IProject project = v.getEclipseProject();
-			if(!project.isOpen()){
-				project.open(null);
+		for(MetaProject metaProject : metaProduct.getMetaProjects()){
+			for(MetaVersion v : metaProject.getVersions()){
+				IProject project = v.getEclipseProject();
+				if(!project.isOpen()){
+					project.open(null);
+				}
+				damp.util.Natures.addNature(project, EkekoNature.NATURE_ID);
 			}
-			damp.util.Natures.addNature(project, EkekoNature.NATURE_ID);
 		}
 	}
 

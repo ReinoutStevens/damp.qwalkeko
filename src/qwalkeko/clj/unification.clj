@@ -1,7 +1,8 @@
 (ns qwalkeko.clj.unification
   (:use qwalkeko.clj.logic)
-  (:require [clojure.core.logic :as logic])
-  (:require [damp.ekeko.jdt.reification :as jdt]))
+  (:require [clojure.core.logic :as logic]
+            [clojure.core.logic.protocols :as prot]
+            [damp.ekeko.jdt.reification :as jdt]))
  
 
 
@@ -27,7 +28,7 @@
   `(do
      (defprotocol ~protname
        (~methodname ~vars))
-     (extend-protocol logic/IUnifyTerms
+     (extend-protocol prot/IUnifyTerms
        ~class
        (:unify-terms [u# v# s#]  ;;lost 3 hours, use keyword here and not a symbol
                     (~methodname v# u# s#)))
@@ -48,6 +49,7 @@
          (generate-unification ~name ~vars ~@body)
          (defunification ~@restunification)))
     '()))
+
 
 
 (defunification

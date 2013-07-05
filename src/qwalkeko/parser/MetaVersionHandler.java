@@ -1,6 +1,8 @@
 package qwalkeko.parser;
 
 import java.io.File;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
@@ -18,8 +20,7 @@ import qwalkeko.ChangedFileInfo.Status;
 
 
 public class MetaVersionHandler {
-
-	Calendar time;
+	Calendar time = new GregorianCalendar();
 	private String commitMessage;
 	private String author;
 	private String revision;
@@ -37,56 +38,39 @@ public class MetaVersionHandler {
 		assert(name.equals("version"));
 		
 		int revisionIdx = atts.getIndex(uri, "revision");
-		int commitIdx = atts.getIndex(uri, "commit");
+		int messageIdx = atts.getIndex(uri, "message");
 		int authorIdx = atts.getIndex(uri, "author");
+		int timeIdx = atts.getIndex(uri, "time");
+		
 		if(revisionIdx == -1){
 			throwException("revision number");
 		}
-		if(commitIdx == -1){
+		if(messageIdx == -1){
 			throwException("commitmessage");
 		}
 		if(authorIdx == -1){
 			throwException("author");
 		}
+		if(timeIdx == -1){
+			throwException("time");
+		}
 		
 		this.revision = atts.getValue(revisionIdx);
-		this.commitMessage = atts.getValue(commitIdx);
+		this.commitMessage = atts.getValue(messageIdx);
 		this.author = atts.getValue(authorIdx);
+		String dateString = atts.getValue(timeIdx);
+		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+		Date date;
+		try {
+			date = format.parse(dateString);
+		} catch (ParseException e) {
+			throw new SAXException(e);
+		}
+		Calendar.getInstance();	
+		this.time.setTime(date);
 	}
 	
-	public void parseTime (String uri, String name, String qName, Attributes atts) throws SAXException{
-		int dayIdx = atts.getIndex(uri, "day");
-		int monthIdx = atts.getIndex(uri, "month");
-		int secIdx = atts.getIndex(uri, "sec");
-		int yearIdx = atts.getIndex(uri, "year");
-		int hourIdx = atts.getIndex(uri, "hour");
-		int minIdx = atts.getIndex(uri, "min");
-		if(dayIdx == -1){
-			throwException("day");
-		}
-		if(monthIdx == -1){
-			throwException("month");
-		}
-		if(secIdx == -1){
-			throwException("sec");
-		}
-		if(yearIdx == -1){
-			throwException("year");
-		}
-		if(hourIdx == -1){
-			throwException("hour");
-		}
-		if(minIdx == -1){
-			throwException("min");
-		}
-		int year = Integer.parseInt(atts.getValue(yearIdx));
-        int monthOfYear = Integer.parseInt(atts.getValue(monthIdx));
-        int dayOfMonth = Integer.parseInt(atts.getValue(dayIdx));
-        int hourOfDay = Integer.parseInt(atts.getValue(hourIdx));
-        int minuteOfHour = Integer.parseInt(atts.getValue(minIdx));
-        int secondOfMinute = Integer.parseInt(atts.getValue(secIdx));
-        this.time = new GregorianCalendar(year, monthOfYear, dayOfMonth, hourOfDay, minuteOfHour, secondOfMinute);
-	}
+	
 	
 	public void parseSuccessor(String uri, String name, String qName, Attributes atts) throws SAXException{
 		int revIdx = atts.getIndex(uri, "revision");

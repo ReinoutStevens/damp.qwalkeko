@@ -14,6 +14,7 @@ import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.DefaultHandler;
 import org.xml.sax.helpers.XMLReaderFactory;
 
+import qwalkeko.MetaProduct;
 import qwalkeko.MetaProject;
 import qwalkeko.MetaVersion;
 
@@ -21,9 +22,10 @@ import qwalkeko.MetaVersion;
 public class ScrapperHandler extends DefaultHandler {
 
 	private Locator locator;
+	private MetaProductHandler currentProduct;
 	private MetaProjectHandler currentProject;
 	private MetaVersionHandler currentVersion;
-	private MetaProject project;
+	private MetaProduct product;
 	
 	
 	public static ScrapperHandler parseFile(File file) throws IOException, SAXException{
@@ -38,8 +40,8 @@ public class ScrapperHandler extends DefaultHandler {
 	}
 	
 	
-	public MetaProject getMetaProject(){
-		return project;
+	public MetaProduct getMetaProduct(){
+		return product;
 	}
 	
 	
@@ -56,7 +58,10 @@ public class ScrapperHandler extends DefaultHandler {
 	
 	public void startElement (String uri, String name, String qName, Attributes atts) throws SAXException{
 		super.startElement(uri, name, qName, atts);
-		if(name.equals("project")){
+		if(name.equals("product")){
+			this.beginProduct(uri, name, qName, atts);
+		}
+		else if(name.equals("project")){
 			this.beginProject(uri, name, qName, atts);
 		} else if(name.equals("version")){
 			this.beginVersion(uri, name, qName, atts);
@@ -64,10 +69,10 @@ public class ScrapperHandler extends DefaultHandler {
 			this.beginPredecessor(uri, name, qName, atts);
 		} else if(name.equals("successor")){
 			this.beginSuccessor(uri, name, qName, atts);
-		} else if(name.equals("time")){
-			this.beginTime(uri, name, qName, atts);
 		} else if(name.equals("changed")){
 			this.beginChanged(uri, name, qName, atts);
+		} else if(name.equals("repository")){
+			this.beginRepository(uri, name, qName, atts);
 		}
 		
 	}
@@ -75,11 +80,23 @@ public class ScrapperHandler extends DefaultHandler {
 
 	public void endElement (String uri, String name, String qName) throws SAXException{
 		super.endElement(uri, name, qName);
-		if(name.equals("project")){
+		if(name.equals("product")){
+			this.endProduct();
+		}
+		else if(name.equals("project")){
 			this.endProject();
 		} else if(name.equals("version")){
 			this.endVersion();
 		}
+	}
+	
+	
+	private void beginProduct(String uri, String name, String qName, Attributes atts) throws SAXException{
+		if(currentProduct != null){
+			throw new SAXParseException("unexpected product", locator);
+		}
+		currentProduct = new MetaProductHandler();
+		currentProduct.parseProduct(uri, name, qName, atts);
 	}
 	
 	
@@ -116,13 +133,7 @@ public class ScrapperHandler extends DefaultHandler {
 		currentVersion.parseSuccessor(uri, name, qName, atts);
 	}
 
-	private void beginTime(String uri, String name, String qName, Attributes atts) throws SAXException{
-		if(currentVersion == null){
-			throw new SAXParseException("unexpected time", locator);
-		}
-		currentVersion.parseTime(uri, name, qName, atts);
-	}
-	
+		
 	private void beginChanged(String uri, String name, String qName, Attributes atts) throws SAXException{
 		if(currentVersion == null){
 			throw new SAXParseException("unexpected changed", locator);
@@ -130,9 +141,22 @@ public class ScrapperHandler extends DefaultHandler {
 		currentVersion.parseChangedFile(uri, name, qName, atts);
 	}
 	
+	private void beginRepository(String uri, String name, String qName, Attributes atts) throws SAXException{
+		if(currentProject == null){
+			throw new SAXParseException("unexpected repository", locator);
+		}
+		currentProject.parseRepository(uri, name, qName, atts);
+	}
+	
 	private void endProject() throws SAXException {
-		this.project = currentProject.createProject();
+		currentProduct.addProject(currentProject.createProject());
 		currentProject = null;
+	}
+	
+	private void endProduct() throws SAXException {
+		this.product = currentProduct.createMetaProduct();
+		product.initialize();
+		currentProduct = null;
 	}
 	
 	private void endVersion() throws SAXException {

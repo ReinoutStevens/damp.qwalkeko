@@ -14,12 +14,12 @@
 (defn rooto [root]
   "Logic goal that unifies root with a root version"
   (logic/all
-    (logic/membero root (all-roots))))
+    (logic/membero root (reification/all-roots))))
 
 (defn versiono [version]
   "Logic goal that unifies version with a metaversion"
   (logic/all
-    (logic/membero version (all-versions))))
+    (logic/membero version (reification/all-versions))))
 
 
 
@@ -37,20 +37,20 @@
   (logic/all
     (versiono version)
     (logic/project [version]
-      (logic/== true (endversion? version)))))
+      (logic/== true (reification/endversion? version)))))
 
 
 (defn ensure-checkouto [version]
   "Logic goals that checks out the given version.
    Version must be grounded."
   (logic/project [version]
-    (logic/== nil (ensure-checkout version))))
+    (logic/== nil (reification/ensure-checkout version))))
 
 (defn ensure-deleteo [version]
   "Logic goal that deletes the given version.
    Version must be grounded"
   (logic/project [version]
-    (logic/== nil (ensure-delete version))))
+    (logic/== nil (reification/ensure-delete version))))
 
 
 ;;QWAL and Logic

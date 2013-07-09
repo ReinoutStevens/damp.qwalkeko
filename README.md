@@ -71,6 +71,10 @@ of what you have to do, but it is probably easier just to send me an email.
 You can clone this repository and import it as an Eclipse plugin project. Note that you will also have to install [Ekeko](https://github.com/cderoove/damp.ekeko/),
 [Keko](https://github.com/ReinoutStevens/damp.keko) and [PPA](http://www.sable.mcgill.ca/ppa/).
 
+The next step is getting a local copy of the git repository you want to query. In order to reason about this repository a metadata file must be constructed so that QwalKeko
+can import the repository. This is done by feeding it to `git-scrapper.core/create-product` and `git-scrapper.core/process-product`, which will output an xml-file. This file can
+then be placed in a new eclipse project. Enabling the Ekeko and History nature on this project will enable reasoning about the repository.
+
 
 ## Implementation
 QwalKeko is implemented on Clojure, and combines [Qwal](https://github.com/ReinoutStevens/damp.qwal) with [Ekeko](https://github.com/cderoove/damp.ekeko).
@@ -106,5 +110,5 @@ of each version (and thus this goal is called first upon backtracking). This goa
 This README still needs to be improved. We have published papers describing our work using QwalKeko, and prior work using Absinthe (a similar idea implemented in SmallTalk, extending SOUL).
 
 
-* [Reasoning over the Evolution of Source Code using Quantiﬁed Regular Path Expressions](http://soft.vub.ac.be/Publications/2011/vub-soft-tr-11-13.pdf)
+* [Reasoning over the Evolution of Source Code using Quantified Regular Path Expressions](http://soft.vub.ac.be/Publications/2011/vub-soft-tr-11-13.pdf)
 * [A History Querying Tool and its Application to Detect Multi-version Refactorings](http://soft.vub.ac.be/Publications/2013/vub-soft-tr-13-02.pdf)

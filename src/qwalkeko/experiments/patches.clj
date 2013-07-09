@@ -12,6 +12,8 @@
                       (q/q=>+))))
 
 
+(defn find-branching-versions [graph a-root]
+  (filter r/was-branched (all-successors graph a-root)))
 
 
 (defn find-corresponding-merges [graph branching-version]
@@ -29,15 +31,15 @@
         right (second succ)]
     (logic/run 1 [result]
                 (q/qwal graph left result []
-                        (q/q=>+)
+                        (q/q=>*)
                         (q/qcurrent [curr]
                                     (l/was-mergedo curr)))
                 (q/qwal graph right result []
-                        (q/q=>+)))))
+                        (q/q=>*)))))
 
 
 (defn find-cochanged-file [graph branching-version]
-  (let [merges (find-corresponding-merges branching-version)]
+  (let [merges (find-corresponding-merge graph branching-version)]
     (when (not (empty? merges))
       (let [first-merge (first merges)
             succ (r/successors branching-version)
@@ -45,20 +47,20 @@
             right (second succ)
             changed-left
             (logic/run* [changed-file]
-                       (q/q=> graph left first-merge
-                              (q/q=>*)
-                              (q/qcurrent [curr]
-                                          (logic/fresh [changed-here]
-                                                       (logic/membero changed-file 
-                                                                      (r/changed-files curr))))
-                              (q/q=>*)))]
+                        (q/qwal graph left first-merge []
+                                (q/q=>*)
+                                (q/qcurrent [curr]
+                                            (logic/membero changed-file 
+                                                           (r/changed-files curr)))
+                                (q/q=>+)))] ;;a + here as we do not want to include the merging version
         (logic/run* [cochanged]
-                   (q/q=> graph right first-merge
-                          (q/q=>*
-                            (q/qcurrent [curr]
-                                        (logic/fresh [changed-here]
-                                                     (logic/membero changed-here
-                                                                    (r/changed-files curr))
-                                                     (logic/membero changed-here
-                                                                    changed-left)
-                                                     (logic/== changed-here cochanged))))))))))
+                   (q/qwal graph right first-merge []
+                          (q/q=>*)
+                          (q/qcurrent [curr]
+                                      (logic/fresh [changed-here]
+                                                   (logic/membero changed-here
+                                                                  (r/changed-files curr))
+                                                   (logic/membero changed-here
+                                                                  changed-left)
+                                                   (logic/== changed-here cochanged)))
+                          (q/q=>+)))))))

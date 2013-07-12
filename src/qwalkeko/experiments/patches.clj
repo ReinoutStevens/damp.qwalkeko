@@ -45,22 +45,22 @@
             succ (r/successors branching-version)
             left (first succ)
             right (second succ)
+            left-limited-graph (l/make-graph-between graph left first-merge)
+            right-limited-graph (l/make-graph-between graph right first-merge)
             changed-left
-            (logic/run* [changed-file]
-                        (q/qwal graph left first-merge []
+            (logic/run* [changed-file changed-version]
+                        (q/qwal left-limited-graph left first-merge []
                                 (q/q=>*)
                                 (q/qcurrent [curr]
                                             (logic/membero changed-file 
-                                                           (r/changed-files curr)))
+                                                           (r/changed-files curr))
+                                            (logic/== changed-version curr))
                                 (q/q=>+)))] ;;a + here as we do not want to include the merging version
-        (logic/run* [cochanged]
-                   (q/qwal graph right first-merge []
+        (logic/run* [cochanged changed-version-left changed-version-right]
+                   (q/qwal right-limited-graph right first-merge []
                           (q/q=>*)
                           (q/qcurrent [curr]
-                                      (logic/fresh [changed-here]
-                                                   (logic/membero changed-here
-                                                                  (r/changed-files curr))
-                                                   (logic/membero changed-here
-                                                                  changed-left)
-                                                   (logic/== changed-here cochanged)))
+                                      (logic/membero cochanged (r/changed-files curr))
+                                      (logic/membero [cochanged changed-version-left] changed-left)
+                                      (logic/changed-version-right curr))
                           (q/q=>+)))))))

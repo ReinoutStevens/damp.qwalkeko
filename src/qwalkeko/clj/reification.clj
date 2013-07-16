@@ -92,7 +92,10 @@
 
 
 (defn file-info-changed? [changedfileinfo]
-  (.hasChanged changedfileinfo))
+  (.wasChanged changedfileinfo))
+
+(defn file-info-edited? [changedfileinfo]
+  (.wasEdited changedfileinfo))
 
 
 (defn changed-file-infos [version]
@@ -112,4 +115,8 @@
 (defn changed-files [version]
   (map get-file-name 
        (filter file-info-changed? (file-infos version))))
+
+(defn edited-files [version]
+  (map get-file-name
+       (filter file-info-edited? (file-infos version))))
 

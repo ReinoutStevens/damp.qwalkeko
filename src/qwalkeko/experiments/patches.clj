@@ -20,29 +20,20 @@
   (let [succ (r/successors branching-version)
         left (first succ)
         right (second succ)
-        merging-left (filter r/was-merged (all-successors graph left))
-        merging-right (filter r/was-merged (all-successors graph right))]
+        merging-left (filter r/was-merged (conj (all-successors graph left) left))
+        merging-right (filter r/was-merged (conj (all-successors graph right) right))]
     (clojure.set/intersection (set merging-left) (set merging-right))))
 
 
 (defn find-corresponding-merge [graph branching-version]
-  (let [succ (r/successors branching-version)
-        left (first succ)
-        right (second succ)]
-    (logic/run 1 [result]
-                (q/qwal graph left result []
-                        (q/q=>*)
-                        (q/qcurrent [curr]
-                                    (l/was-mergedo curr)))
-                (q/qwal graph right result []
-                        (q/q=>*)))))
+  (first (sort-by #(.getTime %1)
+                  (find-corresponding-merges graph branching-version))))
 
 
 (defn find-cochanged-file [graph branching-version]
-  (let [merges (find-corresponding-merge graph branching-version)]
-    (when (not (empty? merges))
-      (let [first-merge (first merges)
-            succ (r/successors branching-version)
+  (let [first-merge (find-corresponding-merge graph branching-version)]
+    (when (not (nil? first-merge))
+      (let [succ (r/successors branching-version)
             left (first succ)
             right (second succ)
             left-limited-graph (l/make-graph-between graph left first-merge)
@@ -53,14 +44,14 @@
                                 (q/q=>*)
                                 (q/qcurrent [curr]
                                             (logic/membero changed-file 
-                                                           (r/changed-files curr))
+                                                           (r/edited-files curr))
                                             (logic/== changed-version curr))
                                 (q/q=>+)))] ;;a + here as we do not want to include the merging version
-        (logic/run* [cochanged changed-version-left changed-version-right]
+        (logic/run* [cochanged left-version right-version]
                    (q/qwal right-limited-graph right first-merge []
                           (q/q=>*)
                           (q/qcurrent [curr]
-                                      (logic/membero cochanged (r/changed-files curr))
-                                      (logic/membero [cochanged changed-version-left] changed-left)
-                                      (logic/changed-version-right curr))
+                                      (logic/membero cochanged (r/edited-files curr))
+                                      (logic/membero [cochanged left-version] changed-left)
+                                      (logic/== right-version curr))
                           (q/q=>+)))))))

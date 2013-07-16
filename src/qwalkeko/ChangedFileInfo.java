@@ -25,8 +25,11 @@ public class ChangedFileInfo {
 		return status;
 	}
 	
-	public boolean hasChanged(){
+	public boolean wasChanged(){
 		return status == Status.ADD || status == Status.EDIT;
 	}
 	
+	public boolean wasEdited(){
+		return status == Status.EDIT;
+	}
 }

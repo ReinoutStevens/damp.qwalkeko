@@ -16,18 +16,26 @@
   (filter r/was-branched (all-successors graph a-root)))
 
 
+(defn find-corresponding-merges-of-versions [graph version-left version-right]
+  (let [merging-left (filter r/was-merged (conj (all-successors graph version-left) version-left))
+        merging-right (filter r/was-merged (conj (all-successors graph version-right) version-right))]
+    (clojure.set/intersection (set merging-left) (set merging-right))))
+
 (defn find-corresponding-merges [graph branching-version]
   (let [succ (r/successors branching-version)
         left (first succ)
-        right (second succ)
-        merging-left (filter r/was-merged (conj (all-successors graph left) left))
-        merging-right (filter r/was-merged (conj (all-successors graph right) right))]
-    (clojure.set/intersection (set merging-left) (set merging-right))))
+        right (second succ)]
+    (find-corresponding-merges-of-versions graph left right)))
 
 
 (defn find-corresponding-merge [graph branching-version]
   (first (sort-by #(.getTime %1)
                   (find-corresponding-merges graph branching-version))))
+
+
+(defn find-corresponding-merge-of-versions [graph version-left version-right]
+  (first (sort-by #(.getTime %1)
+                  (find-corresponding-merges-of-versions graph version-left version-right))))
 
 
 (defn find-cochanged-file [graph branching-version]

@@ -63,3 +63,12 @@
                                       (logic/membero [cochanged left-version] changed-left)
                                       (logic/== right-version curr))
                           (q/q=>+)))))))
+
+(comment
+  
+  (def a-model (first (r/history-project-models)))
+  (def a-project (first (.getMetaProjects (.getMetaProduct a-model))))
+  (def a-graph (l/make-graph a-project))
+  (def branching-versions (find-branching-versions a-graph (first (.getRoots a-project))))
+  (def results (filter (fn [x] (= "java" (apply str (reverse (take 4 (reverse (first x))))))) (apply concat (filter #(not (empty? %1)) (pmap #(find-cochanged-file a-graph %1) branching-versions))))))
+

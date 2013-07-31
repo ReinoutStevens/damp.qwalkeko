@@ -20,7 +20,7 @@ Export-Package: qwalkeko,
  qwalkeko.clj,
  qwalkeko.parser
 Eclipse-RegisterBuddy: damp.ekeko.plugin
-Bundle-ClassPath: lib/changedistiller-0.0.1-SNAPSHOT.jar,
+Bundle-ClassPath: lib/changedistiller-0.0.1-SNAPSHOT-jar-with-dependencies.jar,
  lib/commons-lang3-3.1.jar,
  lib/core.cache-0.5.0.jar,
  lib/core.memoize-0.5.1.jar,

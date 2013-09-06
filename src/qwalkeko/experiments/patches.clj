@@ -3,7 +3,9 @@
   (:require [clojure.core.logic :as logic])
   (:require [damp.qwal :as q])
   (:require [qwalkeko.clj.logic :as l])
-  (:require [qwalkeko.clj.reification :as r]))
+  (:require [qwalkeko.clj.reification :as r])
+  (:require [qwalkeko.clj.sessions :as s])
+  (:require [qwalkeko.clj.changedistiller :as dist]))
 
 
 
@@ -85,10 +87,66 @@
 
 
 ;;Updating patches
+(defn generate-patch [version-a version-b path]
+  ((dist/get-changes version-a version-b path))
 
-(defn update-patch [graph branching-version version-left version-right]
-  (q/qwal graph version-left branching-version []
-        (q/q<=* ;;collect changes
-          ))
+;;trivial case in which a patch can immediately be applied
+(defn update-patch-trivial [graph branching-version source-version target-version patch]
+  patch) ;hooray, research
+
+
+
+;;Case in which we need to track statements of right branch
+(defn will-change-be-affected? [a-change another-change]
+  (let [source (dist/get-changed-entity a-change)]
+    (= (dist/get-changed-entity %1) source)))
+
+
+(defn find-affecting-changes-right-branch [a-change other-changes]
+  (filter #(will-change-be-affected? a-change %1) other-changes))
+
+
+(defn update-change-for-other-change-right-branch [a-change affecting-change]
+  
   )
 
+
+(defn update-change-right-branch [a-change other-changes]
+  )
+
+
+
+(defn update-patch-right-branch [graph branching-version source-version target-version patch]
+  
+)
+
+;;Case in which we need to track statements of left branch
+
+
+
+;;Combination (should be 'trivial')
+
+
+(defn gather-version-pairs [graph start end]
+  (logic/run* [a-pair]
+              (q/qwal graph start end [current next]
+                      (q/q=>*)
+                      (q/qcurrent [curr]
+                                  (logic/== curr current))
+                      q/q=>
+                      (q/qcurrent [curr]
+                                  (logic/== curr next)
+                                  (logic/== a-pair (list curr next)))
+                      (q/q=>*))))
+                             
+                            
+
+
+;;patch is a list of changes
+(defn update-patch [graph branching-version version-left version-right patch]
+  (logic/run 1 [pairs]
+             
+                (q/qwal graph version-left branching-version []
+                        (q/qwhile curr 
+                                  [(!= curr branching-version)]
+                                  (logic/fresh [

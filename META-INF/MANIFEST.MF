@@ -13,7 +13,8 @@ Require-Bundle: org.eclipse.jdt.core,
  org.eclipse.jgit,
  org.apache.commons.lang,
  damp.keko;bundle-version="1.0.0",
- damp.ekeko.plugin;bundle-version="1.0.3"
+ damp.ekeko.plugin;bundle-version="1.0.3",
+ ChangeNodes;bundle-version="1.0.0"
 Bundle-ActivationPolicy: lazy
 Bundle-RequiredExecutionEnvironment: JavaSE-1.6
 Export-Package: qwalkeko,

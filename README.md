@@ -70,6 +70,7 @@ of what you have to do, but it is probably easier just to send me an email.
 
 You can clone this repository and import it as an Eclipse plugin project. Note that you will also have to install [Ekeko](https://github.com/cderoove/damp.ekeko/),
 [Keko](https://github.com/ReinoutStevens/damp.keko) and [PPA](http://www.sable.mcgill.ca/ppa/).
+Finally QwalKeko also depends on [ChangeNodes](https://github.com/ReinoutStevens/ChangeNodes), although it is only needed for some features.
 
 The next step is getting a local copy of the git repository you want to query. In order to reason about this repository a metadata file must be constructed so that QwalKeko
 can import the repository. This is done by feeding it to `git-scrapper.core/create-product` and `git-scrapper.core/process-product`, which will output an xml-file. This file can

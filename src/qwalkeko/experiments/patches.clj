@@ -139,14 +139,4 @@
                                   (logic/== a-pair (list curr next)))
                       (q/q=>*))))
                              
-                            
 
-
-;;patch is a list of changes
-(defn update-patch [graph branching-version version-left version-right patch]
-  (logic/run 1 [pairs]
-             
-                (q/qwal graph version-left branching-version []
-                        (q/qwhile curr 
-                                  [(!= curr branching-version)]
-                                  (logic/fresh [

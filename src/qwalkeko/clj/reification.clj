@@ -87,36 +87,42 @@
   (map close (versions project-model)))
 
 ;;Changed Files
+(defn changed-file-info [status filename]
+  {:status status
+   :file filename})
+
+(defn convert-changed-file-info-status [status]
+  (condp = status
+    qwalkeko.ChangedFileInfo$Status/ADD :add
+    qwalkeko.ChangedFileInfo$Status/EDIT :edit
+    qwalkeko.ChangedFileInfo$Status/DELETE :delete))
+    
+    
+
+(defn convert-changed-file-info [changedfileinfo]
+  (let [status (convert-changed-file-info-status (.getStatus changedfileinfo))]
+    {:status status
+     :file (.getFileName changedfileinfo)}))
+
+
+
 (defn file-infos [version]
-  (seq (.getChangedFileInfos version)))
+  (seq (map convert-changed-file-info (.getChangedFileInfos version))))
 
+(defn file-info-edited? [info]
+  (= :edit (:status info)))
 
-(defn file-info-changed? [changedfileinfo]
-  (.wasChanged changedfileinfo))
+(defn file-info-added? [info]
+  (= :add (:status info)))
 
-(defn file-info-edited? [changedfileinfo]
-  (.wasEdited changedfileinfo))
+(defn file-info-deleted? [info]
+  (= :delete (:status info)))
 
-
-(defn changed-file-infos [version]
-  (filter file-info-changed? (file-infos version)))
 
 (defn file-changed? [path version]
   (let [infos (file-infos version)
-        names (map #(.getFileName %) infos)
+        names (map :file infos)
         ;;path contains the project name as well, which we have to ignore
         cutted-path (.toString (.removeFirstSegments path 1))]
     (some #(= cutted-path %) names)))
-
-
-(defn get-file-name [changedfileinfo]
-  (.getFileName changedfileinfo))
-
-(defn changed-files [version]
-  (map get-file-name 
-       (filter file-info-changed? (file-infos version))))
-
-(defn edited-files [version]
-  (map get-file-name
-       (filter file-info-edited? (file-infos version))))
 

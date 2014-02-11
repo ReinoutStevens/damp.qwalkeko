@@ -194,7 +194,7 @@ public class MetaVersion {
 			IStatus status = new Status(Status.ERROR, Activator.PLUGIN_ID, e.getMessage(), e);
 			throw new CoreException(status);
 		}
-		if(eclipseProject == null){
+		if(eclipseProject == null || !eclipseProject.exists()){
 			createEclipseMetaProject();
 		}
 	}
@@ -210,7 +210,7 @@ public class MetaVersion {
 	private void doCloneOperation(File sourceLocation, File targetLocation) throws IOException, InterruptedException{
 		assert(sourceLocation.exists());
 		assert(!targetLocation.exists());
-		String[] cmd = { "git", "clone", "--shared", sourceLocation.getAbsolutePath(), targetLocation.getAbsolutePath() };
+		String[] cmd = { "/usr/local/git/bin/git", "clone", "--shared", sourceLocation.getAbsolutePath(), targetLocation.getAbsolutePath() };
 		Process proc = Runtime.getRuntime().exec(cmd);
 		if(proc.waitFor() != 0){
 			assert(false);
@@ -234,7 +234,7 @@ public class MetaVersion {
 		*/
 		File root = ResourcesPlugin.getWorkspace().getRoot().getLocation().toFile();
 		File targetLocation = new File(root, getVersionRepositoryLocation());
-		String[] cmd = { "git", "checkout", getRevisionNumber() };
+		String[] cmd = { "/usr/local/git/bin/git", "checkout", getRevisionNumber() };
 		Process proc = Runtime.getRuntime().exec(cmd, null, targetLocation);
 		if(proc.waitFor() != 0){
 			assert(false);
@@ -273,6 +273,7 @@ public class MetaVersion {
 			if(!eclipseProject.hasNature(PPAJavaNature.NATURE_ID)){
 				damp.util.Natures.addNature(eclipseProject, PPAJavaNature.NATURE_ID);
 			}
+		
 		} catch(CoreException e){
 			e.printStackTrace();
 		}

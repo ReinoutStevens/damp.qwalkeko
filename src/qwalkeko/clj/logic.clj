@@ -105,6 +105,55 @@
    :parent a-graph})
 
 
+;;Rules over FileInfo
+
+(defn fileinfo [?fileinfo version]
+  (logic/all
+    (logic/membero ?fileinfo (reification/file-infos version))))
 
 
-   
+(defn fileinfo|status [?fileinfo ?status version]
+  (logic/all
+    (fileinfo ?fileinfo version)
+    (logic/project [?fileinfo]
+                   (logic/featurec ?fileinfo {:status ?status}))))
+
+(defn fileinfo|add [?fileinfo version]
+  (logic/all
+    (fileinfo|status ?fileinfo :add version)))
+
+(defn fileinfo|edit [?fileinfo version]
+  (logic/all
+    (fileinfo|status ?fileinfo :edit version)))
+
+(defn fileinfo|delete [?fileinfo version]
+  (logic/all
+    (fileinfo|status ?fileinfo :delete version)))
+
+
+(defn fileinfo|file [?fileinfo ?file version]
+  (logic/all
+    (fileinfo ?fileinfo version)
+    (logic/project [?fileinfo]
+                   (logic/featurec ?fileinfo {:file ?file}))))
+
+
+
+;;Helper macros
+(defmacro qwalkeko* [ [ & vars] & goals]
+  `(binding [damp.ekeko.ekekomodel/*queried-project-models*  (atom '())]
+     (doall
+       (logic/run* [~@vars] ~@goals))))
+
+
+(defmacro qwalkeko [results [ & vars] & goals]
+    `(binding [damp.ekeko.ekekomodel/*queried-project-models*  (atom '())]
+       (doall
+         (logic/run ~results [~@vars] ~@goals))))
+
+
+(defmacro in-current-meta [[meta] & goals]
+  `(qwal/qcurrent [~meta] ~@goals))
+
+(defmacro in-current [[curr] & goals ]
+  `(qwalkeko.clj.sessions/vcurrent [~curr] ~@goals))

@@ -93,16 +93,6 @@
     (.apply updated-change)))
 
 
-(defn compilation-unit? [astnode]
-  (= (.getNodeType astnode) org.eclipse.jdt.core.dom.ASTNode/COMPILATION_UNIT))
-
-(defn get-ast-path [ast]
-  (let [root (.getRoot ast)]
-    (when (compilation-unit? root)
-      (let [javaelement (.getJavaElement root)] ;;should be a org.eclipse.jdt.internal.core.CompilationUnit
-        (.getPath javaelement)))))
-
-        
 
 ;;Reification
 
@@ -118,14 +108,21 @@
                             (logic/featurec ?change {:original ?left-ast}))))
 
 
-(defn ast-path [?ast ?path]
+(defn change-type [?change ?type]
+  (logic/project [?change]
+    (logic/featurec ?change {:operation ?type})))
+
+
+(defn change|move [?change]
   (logic/all
-    (jdt/ast :ASTNode ?ast)
-    (logic/project [?ast]
-                   (logic/== ?path (get-ast-path ?ast)))))
-
-
-
+    (change-type ?change :move)))
+    
+(defn moved [?ast ?to]
+  (logic/fresh [?lroot ?rroot]
+               (jdt/ast-root ?ast ?lroot)
+               (ast-corresponding-comp-unit ?ast ?rroot)
+               (change ?ast ?lroot ?rroot)
+               (
                
                
 

@@ -1,6 +1,6 @@
 (ns qwalkeko.clj.astnodes
   (:require [clojure.core.logic :as logic])
-  (:require [damp.ekeko.jdt.reification :as jdt])
+  (:require [damp.ekeko.jdt.ast :as jdt])
   (:require [damp.qwal :as qwal])
   (:use [qwalkeko.clj.unification])
   (:use [qwalkeko.clj.reification])

@@ -4,7 +4,7 @@
             Delete Insert Move Update])
   (:require [clojure.core.logic :as logic])
   (:require [damp.ekeko.jdt
-             [reification :as jdt]]))
+             [ast :as jdt]]))
 
 
 

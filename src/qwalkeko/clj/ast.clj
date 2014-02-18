@@ -1,7 +1,7 @@
 (ns qwalkeko.clj.ast
   (:require [clojure.core.logic :as logic])
   (:require [damp.ekeko.jdt
-             [reification :as jdt]]))
+             [ast :as jdt]]))
 
 ;;reification of Java functions
 (defn compilation-unit? [astnode]

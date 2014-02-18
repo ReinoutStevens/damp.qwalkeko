@@ -5,7 +5,7 @@
   (:require [qwalkeko.clj.ast :as ast])
   (:require [qwalkeko.clj.sessions :as sessions]) 
   (:require [damp.ekeko.workspace.reification :as workspace])
-  (:require [damp.ekeko.jdt.reification :as jdt])
+  (:require [damp.ekeko.jdt.ast :as jdt])
   (:import [qwalkeko HistoryProjectModel])
   (:require [damp.qwal :as qwal]))
 

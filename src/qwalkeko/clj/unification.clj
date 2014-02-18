@@ -2,7 +2,7 @@
   (:use qwalkeko.clj.logic)
   (:require [clojure.core.logic :as logic]
             [clojure.core.logic.protocols :as prot]
-            [damp.ekeko.jdt.reification :as jdt]))
+            [damp.ekeko.jdt.ast :as jdt]))
  
 
 

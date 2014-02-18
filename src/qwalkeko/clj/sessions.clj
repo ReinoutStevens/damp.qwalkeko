@@ -1,13 +1,25 @@
 (ns qwalkeko.clj.sessions
   (:refer-clojure :exclude [==])
   (:use [clojure.core.logic :as l])
-  (:use [qwalkeko.clj.logic :as logic])
   (:use [qwalkeko.clj.reification :as reification])
   (:use [damp.ekeko.workspace.projectmodel :as projectmodel])
   (:use [damp.ekeko.workspace.workspace :as workspace]))
  
 
 (def ^:dynamic *current-session*)
+
+(defn ensure-checkouto [version]
+  "Logic goals that checks out the given version.
+   Version must be grounded."
+  (l/project [version]
+    (l/== nil (reification/ensure-checkout version))))
+
+(defn ensure-deleteo [version]
+  "Logic goal that deletes the given version.
+   Version must be grounded"
+  (l/project [version]
+    (l/== nil (reification/ensure-delete version))))
+
 
 (defn open-session []
   #{})
@@ -34,7 +46,7 @@
        (throw (new qwalkeko.SessionUnboundException)))
      (l/project [~version]
        (l/all
-         (logic/ensure-checkouto ~version)
+         (ensure-checkouto ~version)
          (l/== nil ;;isnt she pretty?
              (do 
                (set! *current-session* (conj *current-session* ~version))
@@ -65,7 +77,7 @@
   `(fn [graph# ~version next#]
      (l/project [~version]
                     (all
-                      (logic/ensure-checkouto ~version)
+                      (ensure-checkouto ~version)
                       (set-current ~version)
                       (wait-for-builds-to-finisho)
                       ~@goals

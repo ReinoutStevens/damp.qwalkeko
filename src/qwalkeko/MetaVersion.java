@@ -42,6 +42,7 @@ import damp.keko.PPAJavaNature;
 //look at ProjectNature
 public class MetaVersion {
 
+	private final String gitCommand = "/usr/local/git/bin/git";
 	private final String revisionNumber; //used as key in some places
 
 	private Collection<String> successorRevisions;
@@ -210,7 +211,7 @@ public class MetaVersion {
 	private void doCloneOperation(File sourceLocation, File targetLocation) throws IOException, InterruptedException{
 		assert(sourceLocation.exists());
 		assert(!targetLocation.exists());
-		String[] cmd = { "/usr/local/git/bin/git", "clone", "--shared", sourceLocation.getAbsolutePath(), targetLocation.getAbsolutePath() };
+		String[] cmd = { gitCommand, "clone", "--shared", sourceLocation.getAbsolutePath(), targetLocation.getAbsolutePath() };
 		Process proc = Runtime.getRuntime().exec(cmd);
 		if(proc.waitFor() != 0){
 			assert(false);
@@ -234,7 +235,7 @@ public class MetaVersion {
 		*/
 		File root = ResourcesPlugin.getWorkspace().getRoot().getLocation().toFile();
 		File targetLocation = new File(root, getVersionRepositoryLocation());
-		String[] cmd = { "/usr/local/git/bin/git", "checkout", getRevisionNumber() };
+		String[] cmd = { gitCommand, "checkout", getRevisionNumber() };
 		Process proc = Runtime.getRuntime().exec(cmd, null, targetLocation);
 		if(proc.waitFor() != 0){
 			assert(false);
@@ -267,13 +268,15 @@ public class MetaVersion {
 			if(!eclipseProject.isOpen()){
 				eclipseProject.open(null);
 			}
-			if(!eclipseProject.hasNature(EkekoNature.NATURE_ID)){
-				damp.util.Natures.addNature(eclipseProject, EkekoNature.NATURE_ID);
+			//always add ekeko nature last as the model starts building once the nature is added
+			//some natures modify how ekeko builds its model
+			String[] natures = new String[]{ QwalkekoNature.NATURE_ID, EkekoNature.NATURE_ID };
+			for (int i = 0; i < natures.length; i++) {
+				String nature = natures[i];
+				if(!eclipseProject.hasNature(nature)){
+					damp.util.Natures.addNature(eclipseProject, nature);
+				}
 			}
-			if(!eclipseProject.hasNature(PPAJavaNature.NATURE_ID)){
-				damp.util.Natures.addNature(eclipseProject, PPAJavaNature.NATURE_ID);
-			}
-		
 		} catch(CoreException e){
 			e.printStackTrace();
 		}

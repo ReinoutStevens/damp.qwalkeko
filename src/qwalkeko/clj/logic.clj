@@ -1,7 +1,9 @@
 (ns qwalkeko.clj.logic
   (:refer-clojure :exclude [== type])
   (:require [clojure.core.logic :as logic])
-  (:require [qwalkeko.clj.reification :as reification] )
+  (:require [qwalkeko.clj.reification :as reification])
+  (:require [qwalkeko.clj.ast :as ast])
+  (:require [qwalkeko.clj.sessions :as sessions]) 
   (:require [damp.ekeko.workspace.reification :as workspace])
   (:require [damp.ekeko.jdt.reification :as jdt])
   (:import [qwalkeko HistoryProjectModel])
@@ -40,17 +42,7 @@
       (logic/== true (reification/endversion? version)))))
 
 
-(defn ensure-checkouto [version]
-  "Logic goals that checks out the given version.
-   Version must be grounded."
-  (logic/project [version]
-    (logic/== nil (reification/ensure-checkout version))))
 
-(defn ensure-deleteo [version]
-  "Logic goal that deletes the given version.
-   Version must be grounded"
-  (logic/project [version]
-    (logic/== nil (reification/ensure-delete version))))
 
 
 ;;QWAL and Logic
@@ -156,4 +148,4 @@
   `(qwal/qcurrent [~meta] ~@goals))
 
 (defmacro in-current [[curr] & goals ]
-  `(qwalkeko.clj.sessions/vcurrent [~curr] ~@goals))
+  `(sessions/vcurrent [~curr] ~@goals))

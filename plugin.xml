@@ -55,6 +55,16 @@
 	      </builder>
 	</extension>
 	
+	 <extension
+      point="org.eclipse.core.resources.natures"
+      id="qwalkekoNature"
+      name="Qwalkeko Nature">
+      <runtime>
+         <run class="qwalkeko.QwalkekoNature">
+         </run>
+      </runtime>
+   </extension>
+	
 	<extension
          id="historyBuilder"
          name="History Builder"
@@ -69,6 +79,12 @@
        point="ekeko.projectModelFactory">
     <contributedFactory
           factory="qwalkeko.HistoryProjectModelFactory">
+    </contributedFactory>
+ </extension>
+ <extension
+       point="ekeko.projectModelFactory">
+    <contributedFactory
+          factory="qwalkeko.QwalkekoProjectModelFactory">
     </contributedFactory>
  </extension>
 

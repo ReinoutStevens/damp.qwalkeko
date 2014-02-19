@@ -15,7 +15,9 @@ import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.jgit.api.CheckoutCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
@@ -276,6 +278,13 @@ public class MetaVersion {
 				if(!eclipseProject.hasNature(nature)){
 					damp.util.Natures.addNature(eclipseProject, nature);
 				}
+			}
+			try {
+				Job.getJobManager().join(ResourcesPlugin.FAMILY_AUTO_BUILD, null);
+			} catch (OperationCanceledException e) {
+				e.printStackTrace();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
 			}
 		} catch(CoreException e){
 			e.printStackTrace();

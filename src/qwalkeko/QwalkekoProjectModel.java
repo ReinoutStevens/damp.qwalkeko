@@ -49,6 +49,7 @@ public class QwalkekoProjectModel extends JavaProjectModel {
 		System.out.println("Populating QwalkekoProjectModel for: " + javaProject.getElementName());
 		findAndAddJavaFiles();
 		for (IFile javaFile : javaFiles) {
+			IPath localPath = javaFile.getLocation();
 			String osPath = javaFile.getRawLocation().toOSString();
 			String contents;
 			try {
@@ -58,7 +59,7 @@ public class QwalkekoProjectModel extends JavaProjectModel {
 				IStatus status = new Status(Status.ERROR, Activator.PLUGIN_ID, e.getMessage());
 				throw new CoreException(status);
 			}
-			CompilationUnit unit = parse(contents);
+			CompilationUnit unit = parse(contents, localPath);
 			cus.add(unit);
 		}
 		
@@ -122,11 +123,12 @@ public class QwalkekoProjectModel extends JavaProjectModel {
 	}
 	
 	
-	private CompilationUnit parse(String str) {
+	private CompilationUnit parse(String str, IPath location) {
 		ASTParser parser = ASTParser.newParser(AST.JLS4);
 		parser.setSource(str.toCharArray());
 		parser.setKind(ASTParser.K_COMPILATION_UNIT);
-		
+		parser.setUnitName(location.toString());
+		parser.setProject(getJavaProject());
 		CompilationUnit cu = (CompilationUnit) parser.createAST(null);
 		return cu;
 	}

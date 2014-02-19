@@ -65,10 +65,6 @@
           true))))
 
 
-(defn wait-for-builds-to-finisho []
-  (l/all
-    (l/== nil (workspace/workspace-wait-for-builds-to-finish))))
-
 (defmacro vcurrent [[version] & goals]
   "Opens and sets the current version, and will evaluate all the goals in the current version.
 
@@ -79,7 +75,6 @@
                     (all
                       (ensure-checkouto ~version)
                       (set-current ~version)
-                      (wait-for-builds-to-finisho)
                       ~@goals
                       (l/== ~version next#)
                       ;;we directly create a core.logic goal that just returns the substitutions

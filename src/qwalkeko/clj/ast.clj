@@ -38,11 +38,71 @@
                    (logic/== ?path (get-ast-path ?ast)))))
 
 
+;;As we manually parse files we can no longer rely on paths to retrieve them
+;;Instead we'll use package name + name of the class
+
+;;modifiers
+
+(defmacro make-modifier [name]
+  (let [actual-name (symbol (str "modifier|" name))
+        accessor (symbol
+                   (str ".is" 
+                        (clojure.string/capitalize 
+                          (apply str (butlast (str name))))))
+        ?modifier '?modifier]
+    `(defn ~actual-name [~?modifier]
+       (logic/all
+         (jdt/ast :Modifier ~?modifier)
+         (logic/project [~?modifier]
+                        (logic/== true (~accessor ~?modifier)))))))
+                        
+(make-modifier abstract?)
+(make-modifier annotation?)
+(make-modifier final?)
+(make-modifier modifier?)
+(make-modifier native?)
+(make-modifier public?)
+(make-modifier private?)
+(make-modifier protected?)
+(make-modifier static?)
+(make-modifier synchronized?)
+(make-modifier transient?)
+(make-modifier volatile?)
+
+
+(defn compilationunit-packagedeclaration [?compunit ?package]
+  (logic/all
+    (jdt/ast :CompilationUnit ?compunit)
+    (logic/project [?compunit]
+                   (logic/==
+                     (.getPackage ?compunit)
+                     ?package))))
+
+(defn typedeclaration|public? [?typedeclaration]
+  (logic/fresh [?modifier]
+               (jdt/ast :TypeDeclaration ?typedeclaration)
+               (jdt/child :modifiers ?typedeclaration ?modifier)
+               (modifier|public? ?modifier)))
+
+
+
+(defn compilationunit-typedeclaration|main [?compunit ?typedeclaration]
+  (logic/fresh [?types]
+    (jdt/ast :CompilationUnit ?compunit)
+    (logic/project [?compunit]
+                   (logic/== ?types (seq (.types ?compunit)))
+                   (logic/membero ?typedeclaration ?types)
+                   (typedeclaration|public? ?typedeclaration))))
+
 
 (defn ast-compilationunit|corresponding [ast ?compunit]
-  "finds the corresponding compilationunit in this version of the ast"
-  (logic/fresh [?root ?path]
+  "finds the corresponding compilationunit of the ast in the current version"
+  (logic/fresh [?root ?path ?leftname ?leftmain ?rightname ?rightmain]
                (logic/project [ast]
-                              (ast-path ast ?path)
+                              (jdt/ast-root ast ?root)
+                              (compilationunit-typedeclaration|main ?root ?leftmain)
+                              (jdt/has :name ?leftmain ?leftname)
                               (jdt/ast :CompilationUnit ?compunit)
-                              (ast-path ?compunit ?path))))
+                              (compilationunit-typedeclaration|main ?compunit ?rightmain)
+                              (jdt/has :name ?rightmain ?rightname)
+                              (jdt/name-name|same|qualified ?leftname ?rightname))))

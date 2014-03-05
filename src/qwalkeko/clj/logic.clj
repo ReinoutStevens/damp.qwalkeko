@@ -103,6 +103,9 @@
   (logic/all
     (logic/membero ?fileinfo (reification/file-infos version))))
 
+(defn fileinfos [?fileinfos version]
+  (logic/all
+    (logic/== ?fileinfos (reification/file-infos version))))
 
 (defn fileinfo|status [?fileinfo ?status version]
   (logic/all

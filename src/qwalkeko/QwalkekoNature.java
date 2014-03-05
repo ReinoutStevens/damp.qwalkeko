@@ -4,8 +4,6 @@ import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IProjectNature;
 import org.eclipse.core.runtime.CoreException;
 
-
-
 public class QwalkekoNature implements IProjectNature{
 	
 	public static final String NATURE_ID = "qwalkeko.qwalkekoNature";

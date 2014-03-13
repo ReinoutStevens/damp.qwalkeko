@@ -45,16 +45,6 @@
 
 
 
-;;QWAL and Logic
-(defn predecessoro [version pred]
-  (logic/all
-    (logic/== pred (reification/predecessors version))))
-
-(defn successoro [version succ]
-  (logic/all
-    (logic/== succ (reification/successors version))))
-
-
 (defn qendversiono [graph start end]
   (logic/all
     (endversiono start)
@@ -64,37 +54,6 @@
   (logic/all
     (rooto start)
     (logic/== start end)))
-
-
-;;Graph Helpers
-(defn make-graph [project-model]
-  "basic graph that considers all the versions"
-  {:predecessors predecessoro
-   :successors successoro
-   :project project-model
-   })
-
-
-;;Graph Decorators that filter out certain versions
-;;They all take a graph as argument and return a new graph
-;;which can be decorated again
-(defn make-graph-between [a-graph start end]
-  {:successors
-   (fn [version succ]
-     (logic/all
-       (logic/conda
-         [(logic/== end version)
-          (logic/== end '())]
-         [((:successors a-graph) version succ)])))
-   :predecessors
-   (fn [version pred]
-     (logic/all
-       (logic/conda
-         [(logic/== start version)
-          (logic/== pred '())]
-         [((:predecessors a-graph) version pred)])))
-   :project (:project a-graph)
-   :parent a-graph})
 
 
 ;;Rules over FileInfo

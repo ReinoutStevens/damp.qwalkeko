@@ -161,14 +161,71 @@
          versions)))
 
     
+(comment
+  (def a-model (first (damp.ekeko.ekekomodel/all-project-models)))
+  (def a-project (.getProject a-model))
+  (def meta-project (first (.getMetaProjects (.getMetaProduct a-model))))
+  (def a-graph (l/make-graph meta-project))
+  (def a-root (first (.getRoots meta-project)))
+  (def results (changed-files-clojure meta-project))
+  (output-results results "/Users/resteven/Desktop/files.csv"))
 
 
-  (comment
-    (def a-model (first (damp.ekeko.ekekomodel/all-project-models)))
-    (def a-project (.getProject a-model))
-    (def meta-project (first (.getMetaProjects (.getMetaProduct a-model))))
-    (def a-graph (l/make-graph meta-project))
-    (def a-root (first (.getRoots meta-project)))
-    (def results (changed-files-clojure meta-project))
-    (output-results results "/Users/resteven/Desktop/files.csv"))
+
+;;change patterns
+
+;;modify graph so we only loop over versions that modify selenium files
+;;apparently doesnt scale...
+(defn version|modified-selenium [?version]
+  (logic/fresh [?info]
+               (l/fileinfo ?info ?version)
+               (logic/onceo
+                 (fileinfo|selenium ?info))))
+
+
+(defn selenium-predicates [version f]
+  (defn magic [to-process result]
+    (if (empty? to-process)
+      result
+      (let [head (first to-process)
+            infos (r/file-infos head)]
+        (if (some is-selenium-file? infos)
+          (recur (rest to-process) (conj result head))
+          (recur (concat (f head) (rest to-process)) result)))))
+  (let [to-process (f version)]
+    (magic to-process '())))
     
+(defn selenium-successors [version]
+  (selenium-predicates version r/successors))
+
+(defn selenium-predecessors [version]
+  (selenium-predicates version r/predecessors))
+
+(defn selenium-successoro [version succ]
+  (logic/all
+    (logic/== succ (selenium-successors version))))
+
+(defn selenium-predecessoro [version pred]
+  (logic/all
+    (logic/== pred (selenium-predecessors version))))
+
+(defn selenium-graph [graph]
+  {:predecessors selenium-predecessoro
+   :successors selenium-successoro
+   :project (:project graph)})
+
+
+(defn change-pattern-query [x graph root file]
+ (l/qwalkeko x [?info ?end]
+     (qwal/qwal graph root ?end [?info ?changedinfo]
+                (qwal/q=>*)
+                (l/in-current-meta [curr]
+                                   (l/fileinfo|file ?info file curr)
+                                   (l/fileinfo|add ?info curr)
+                                   (fileinfo|selenium ?info))
+                (qwal/q=>+)
+                (l/in-current-meta [curr]
+                                   (l/fileinfo|file ?changedinfo file curr)
+                                   (l/fileinfo|edit ?changedinfo curr)))))
+                
+                                   

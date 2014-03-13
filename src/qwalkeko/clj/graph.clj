@@ -1,0 +1,110 @@
+(ns qwalkeko.clj.graph
+  (:require [qwalkeko.clj.reification :as r])
+  (:require [clojure.core.logic :as logic]))
+
+
+(defrecord Metaversion [jmetaversion successors predecessors])
+
+(defn metaversion [metaversion]
+  (Metaversion. metaversion (atom '())  (atom '())))
+
+(defmethod clojure.core/print-method Metaversion [x writer]
+  (.write writer (str "Metaversion" (.getRevisionNumber (:jmetaversion x)))))
+
+
+(defn successors [version]
+  @(:successors version))
+
+(defn predecessors [version]
+  @(:predecessors version))
+
+
+(defn predecessors! [metaversion predecessors]
+  (reset! (:predecessors metaversion) predecessors))
+
+(defn successors! [metaversion successors]
+  (reset! (:successors metaversion) successors))
+
+
+
+(defn convert-to-graph [versions]
+  (let [converted (zipmap versions (map #(metaversion %) versions))]
+    (doall
+      (map (fn [version]
+             (let [c (get converted version)]
+               (do
+                 (successors! c
+                              (map (fn [succ]
+                                     (get converted succ))
+                                   (r/successors version)))
+                 (predecessors! c
+                                (map (fn [pred]
+                                       (get converted pred))
+                                     (r/successors version))))))
+           versions))
+    converted))
+
+(defn successoro [version succs]
+  (logic/project [version]
+                 (logic/== succs (successors version))))
+
+(defn predecessoro [version preds]
+  (logic/project [version]
+                 (logic/== preds (predecessors version))))
+
+(defn convert-project-to-graph [meta-project]
+  (let [roots (.getRoots meta-project)
+        versions (.getVersions meta-project)
+        converted (convert-to-graph versions)]
+    {:roots (map #(get converted %) roots)
+     :project meta-project
+     :successors successoro
+     :predecessors predecessoro
+     :versions (fn [] (vals converted))})) ;function so printer doesn't print *all* the things
+
+(defn versions [graph]
+  ((:versions graph)))
+
+(defn roots [graph]
+  (:roots graph))
+
+
+
+(defn filter-graph [graph f]
+  (defn add-predecessor! [v pred]
+    (swap! (:predecessors v) conj pred))
+  
+  (defn filter-versions [versions]
+    (let [filtered (filter f versions)]
+      (zipmap filtered (map metaversion (map :jmetaversion filtered)))))
+  
+  (defn collect-successors [version filtered] ;;version is from the original graph
+    (let [mapped (get filtered version) ;;get new metaversion
+          succs (successors version) ;;get successors in old one
+          non-filtered (remove #(contains? filtered %) succs) ;;contains successors that are filtered as well
+          filtered-succs (map #(get filtered %) (filter #(contains? filtered %) succs))
+          recursive-succs (mapcat #(collect-successors % filtered) non-filtered)
+          result (concat filtered-succs recursive-succs)]
+      (do
+        (when mapped
+          (doall
+            (map #(add-predecessor! % mapped) result)))
+        result)))
+  
+  (defn link-version [version filtered]
+    (let [successors (collect-successors version filtered)]
+      (do
+        (successors! version successors))))
+  
+  (let [v (versions graph)
+        filtered (filter-versions v)
+        vls (vals filtered)]
+    (do
+      (doall
+        (map #(link-version % filtered) (keys filtered)))
+      (assoc graph 
+        :roots (filter #(empty? (predecessors %)) vls)
+        :versions (fn [] vls)))))
+      
+  
+             

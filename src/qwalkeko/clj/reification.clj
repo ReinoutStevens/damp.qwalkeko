@@ -34,6 +34,8 @@
 
 
 ;;MetaVersion Stuff
+;;Note that this returns Java MetaVersions
+;;You probably want to look at graph for other predicates
 (defn all-versions []
   (let [models (history-project-models)]
     (mapcat versions models)))
@@ -45,6 +47,8 @@
         (roots metaproject)))
     (history-project-models)))
 
+(defn eclipse-project [version]
+  (.getEclipseProject version))
 
 (defn successors [version]
   (seq (.getSuccessors version)))

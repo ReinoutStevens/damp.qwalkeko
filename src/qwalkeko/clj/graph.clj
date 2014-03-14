@@ -3,13 +3,15 @@
   (:require [clojure.core.logic :as logic]))
 
 
-(defrecord Metaversion [jmetaversion successors predecessors])
+(defrecord Metaversion [jmetaversion successors predecessors]
+  clojure.core.logic.protocols.IUninitialized
+  (-uninitialized [_] (Metaversion. nil (atom '()) (atom '()))))
 
 (defn metaversion [metaversion]
   (Metaversion. metaversion (atom '())  (atom '())))
 
 (defmethod clojure.core/print-method Metaversion [x writer]
-  (.write writer (str "Metaversion" (.getRevisionNumber (:jmetaversion x)))))
+  (.write writer (str "#<Metaversion-" (.getRevisionNumber (:jmetaversion x)) ">")))
 
 
 (defn successors [version]
@@ -25,6 +27,15 @@
 (defn successors! [metaversion successors]
   (reset! (:successors metaversion) successors))
 
+
+(defn ensure-checkout [metaversion]
+  (r/ensure-checkout (:jmetaversion metaversion)))
+
+(defn ensure-delete [metaversion]
+  (r/ensure-delete (:jmetaversion metaversion)))
+
+(defn eclipse-project [metaversion]
+  (r/eclipse-project (:jmetaversion metaversion)))
 
 
 (defn convert-to-graph [versions]
@@ -52,18 +63,28 @@
   (logic/project [version]
                  (logic/== preds (predecessors version))))
 
+
+(defrecord Graph [roots project successors predecessors versions]
+  clojure.core.logic.protocols.IUninitialized
+  (-uninitialized [_] (Graph. '() nil '() '() '())))
+
+(defmethod clojure.core/print-method Graph [x writer]
+  (.write writer (str "#<Graph-" (.getName (:project x)) ">")))
+
 (defn convert-project-to-graph [meta-project]
   (let [roots (.getRoots meta-project)
         versions (.getVersions meta-project)
         converted (convert-to-graph versions)]
-    {:roots (map #(get converted %) roots)
-     :project meta-project
-     :successors successoro
-     :predecessors predecessoro
-     :versions (fn [] (vals converted))})) ;function so printer doesn't print *all* the things
+    (Graph. 
+      (map #(get converted %) roots)
+      meta-project
+      successoro
+      predecessoro
+      (vals converted))))
+
 
 (defn versions [graph]
-  ((:versions graph)))
+  (:versions graph))
 
 (defn roots [graph]
   (:roots graph))
@@ -96,7 +117,7 @@
       (do
         (successors! version successors))))
   
-  (let [v (versions graph)
+  (let [v (:versions graph)
         filtered (filter-versions v)
         vls (vals filtered)]
     (do

@@ -3,6 +3,8 @@
    (:require [clojure.core.logic :as logic])
    (:require [qwalkeko.clj.logic :as l])
    (:require [qwalkeko.clj.reification :as r])
+   (:require [qwalkeko.clj.graph :as graph])
+
    (:require [damp.ekeko.jdt
               [ast :as jdt]])
    (:require [damp.qwal :as qwal]))
@@ -165,8 +167,8 @@
   (def a-model (first (damp.ekeko.ekekomodel/all-project-models)))
   (def a-project (.getProject a-model))
   (def meta-project (first (.getMetaProjects (.getMetaProduct a-model))))
-  (def a-graph (l/make-graph meta-project))
-  (def a-root (first (.getRoots meta-project)))
+  (def a-graph (graph/convert-project-to-graph meta-project))
+  (def a-root (first (:roots a-graph)))
   (def results (changed-files-clojure meta-project))
   (output-results results "/Users/resteven/Desktop/files.csv"))
 

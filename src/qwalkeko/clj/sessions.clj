@@ -1,24 +1,25 @@
 (ns qwalkeko.clj.sessions
   (:refer-clojure :exclude [==])
-  (:use [clojure.core.logic :as l])
-  (:use [qwalkeko.clj.reification :as reification])
-  (:use [damp.ekeko.workspace.projectmodel :as projectmodel])
-  (:use [damp.ekeko.workspace.workspace :as workspace]))
+  (:require [clojure.core.logic :as logic])
+  (:require [qwalkeko.clj.graph :as graph])
+  (:require [qwalkeko.clj.reification :as reification])
+  (:require [damp.ekeko.workspace.projectmodel :as projectmodel])
+  (:require [damp.ekeko.workspace.workspace :as workspace]))
  
-
-(def ^:dynamic *current-session*)
-
+;;Metaversions
 (defn ensure-checkouto [version]
   "Logic goals that checks out the given version.
    Version must be grounded."
-  (l/project [version]
-    (l/== nil (reification/ensure-checkout version))))
+  (logic/project [version]
+    (logic/== nil (graph/ensure-checkout version))))
+
 
 (defn ensure-deleteo [version]
   "Logic goal that deletes the given version.
    Version must be grounded"
-  (l/project [version]
-    (l/== nil (reification/ensure-delete version))))
+  (logic/project [version]
+    (logic/== nil (graph/ensure-delete version))))
+
 
 
 (defn open-session []
@@ -26,7 +27,7 @@
 
 (defn close-session [session]
   (doall
-    (map reification/ensure-delete session)))
+    (map graph/ensure-delete session)))
 
 
 (defmacro in-session [ & body]
@@ -44,24 +45,23 @@
   `(fn [~graph ~version ~next]
      (when (not (bound? #'*current-session*))
        (throw (new qwalkeko.SessionUnboundException)))
-     (l/project [~version]
-       (l/all
+     (logic/project [~version]
+       (logic/all
          (ensure-checkouto ~version)
-         (l/== nil ;;isnt she pretty?
+         (logic/== nil ;;isnt she pretty?
              (do 
                (set! *current-session* (conj *current-session* ~version))
                nil))
          ~@goals
-         (l/== ~version ~next))))))
+         (logic/== ~version ~next))))))
 
 
 (defn set-current [version]
-  (l/all
-    (l/== true 
+  (logic/all
+    (logic/== true 
         (do
-          (swap! damp.ekeko.ekekomodel/*queried-project-models* 
-                 (fn [previous] 
-                   (seq (.getProjectModel (damp.ekeko.EkekoModel/getInstance) (.getEclipseProject version)))))
+          (reset! damp.ekeko.ekekomodel/*queried-project-models* 
+                (seq (.getProjectModel (damp.ekeko.EkekoModel/getInstance) (graph/eclipse-project version))))
           true))))
 
 
@@ -71,12 +71,12 @@
   To ensure that the goals are always evaluated in the correct version (for example when backtracking) an additional
   goal is added to the end that resets the current version."
   `(fn [graph# ~version next#]
-     (l/project [~version]
-                    (all
-                      (ensure-checkouto ~version)
+     (logic/project [~version]
+                    (logic/all
+                      (graph/ensure-checkouto ~version)
                       (set-current ~version)
                       ~@goals
-                      (l/== ~version next#)
+                      (logic/== ~version next#)
                       ;;we directly create a core.logic goal that just returns the substitutions
                       ;;as a sideeffect we restore the current version, used upon backtracking
                       ;;when you get weird results, start looking here :)

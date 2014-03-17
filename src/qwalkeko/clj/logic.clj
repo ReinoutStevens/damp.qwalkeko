@@ -17,11 +17,11 @@
 
 (defn fileinfo [?fileinfo version]
   (logic/all
-    (logic/membero ?fileinfo (reification/file-infos version))))
+    (logic/membero ?fileinfo (graph/file-infos version))))
 
 (defn fileinfos [?fileinfos version]
   (logic/all
-    (logic/== ?fileinfos (reification/file-infos version))))
+    (logic/== ?fileinfos (graph/file-infos version))))
 
 (defn fileinfo|status [?fileinfo ?status version]
   (logic/all
@@ -47,6 +47,11 @@
     (fileinfo ?fileinfo version)
     (logic/project [?fileinfo]
                    (logic/featurec ?fileinfo {:file ?file}))))
+
+;;general version information
+(defn revisionnumber [?number version]
+  (logic/all
+    (logic/== ?number (graph/revision-number version))))
 
 
 

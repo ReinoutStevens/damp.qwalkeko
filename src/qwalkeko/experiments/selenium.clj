@@ -176,8 +176,6 @@
 
 ;;change patterns
 
-;;modify graph so we only loop over versions that modify selenium files
-;;apparently doesnt scale...
 (defn version|modified-selenium [?version]
   (logic/fresh [?info]
                (l/fileinfo ?info ?version)
@@ -185,36 +183,10 @@
                  (fileinfo|selenium ?info))))
 
 
-(defn selenium-predicates [version f]
-  (defn magic [to-process result]
-    (if (empty? to-process)
-      result
-      (let [head (first to-process)
-            infos (r/file-infos head)]
-        (if (some is-selenium-file? infos)
-          (recur (rest to-process) (conj result head))
-          (recur (concat (f head) (rest to-process)) result)))))
-  (let [to-process (f version)]
-    (magic to-process '())))
-    
-(defn selenium-successors [version]
-  (selenium-predicates version r/successors))
-
-(defn selenium-predecessors [version]
-  (selenium-predicates version r/predecessors))
-
-(defn selenium-successoro [version succ]
-  (logic/all
-    (logic/== succ (selenium-successors version))))
-
-(defn selenium-predecessoro [version pred]
-  (logic/all
-    (logic/== pred (selenium-predecessors version))))
-
-(defn selenium-graph [graph]
-  {:predecessors selenium-predecessoro
-   :successors selenium-successoro
-   :project (:project graph)})
+(defn graph-to-selenium-graph [graph]
+  (graph/filter-graph graph
+    (fn [v] (let [infos (r/file-infos v)]
+              (some is-selenium-file? infos)))))
 
 
 (defn change-pattern-query [x graph root file]
@@ -229,5 +201,8 @@
                 (l/in-current-meta [curr]
                                    (l/fileinfo|file ?changedinfo file curr)
                                    (l/fileinfo|edit ?changedinfo curr)))))
+
+
+
                 
                                    

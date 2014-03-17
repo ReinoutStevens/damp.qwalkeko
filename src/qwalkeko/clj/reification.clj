@@ -73,6 +73,8 @@
 (defn ensure-delete [version]
   (.closeAndDeleteIfNeeded version))
 
+(defn revision-number [version]
+  (.getRevisionNumber version))
 
 ;;EclipseProject
 

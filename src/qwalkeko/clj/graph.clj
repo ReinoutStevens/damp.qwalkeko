@@ -8,7 +8,7 @@
   (-uninitialized [_] (Metaversion. nil (atom '()) (atom '()))))
 
 (defn metaversion [metaversion]
-  (Metaversion. metaversion (atom '())  (atom '())))
+  (Metaversion. metaversion (atom '#{})  (atom #{})))
 
 (defmethod clojure.core/print-method Metaversion [x writer]
   (.write writer (str "#<Metaversion-" (.getRevisionNumber (:jmetaversion x)) ">")))
@@ -22,20 +22,11 @@
 
 
 (defn predecessors! [metaversion predecessors]
-  (reset! (:predecessors metaversion) predecessors))
+  (reset! (:predecessors metaversion) (set predecessors)))
 
 (defn successors! [metaversion successors]
-  (reset! (:successors metaversion) successors))
+  (reset! (:successors metaversion) (set successors)))
 
-
-(defn ensure-checkout [metaversion]
-  (r/ensure-checkout (:jmetaversion metaversion)))
-
-(defn ensure-delete [metaversion]
-  (r/ensure-delete (:jmetaversion metaversion)))
-
-(defn eclipse-project [metaversion]
-  (r/eclipse-project (:jmetaversion metaversion)))
 
 
 (defn convert-to-graph [versions]
@@ -51,17 +42,17 @@
                  (predecessors! c
                                 (map (fn [pred]
                                        (get converted pred))
-                                     (r/successors version))))))
+                                     (r/predecessors version))))))
            versions))
     converted))
 
 (defn successoro [version succs]
   (logic/project [version]
-                 (logic/== succs (successors version))))
+                 (logic/== succs (seq (successors version)))))
 
 (defn predecessoro [version preds]
   (logic/project [version]
-                 (logic/== preds (predecessors version))))
+                 (logic/== preds (seq (predecessors version)))))
 
 
 (defrecord Graph [roots project successors predecessors versions]
@@ -82,6 +73,7 @@
       predecessoro
       (vals converted))))
 
+;;Retrieve information out of versions / graphs
 
 (defn versions [graph]
   (:versions graph))
@@ -89,8 +81,23 @@
 (defn roots [graph]
   (:roots graph))
 
+(defn ensure-checkout [metaversion]
+  (r/ensure-checkout (:jmetaversion metaversion)))
+
+(defn ensure-delete [metaversion]
+  (r/ensure-delete (:jmetaversion metaversion)))
+
+(defn eclipse-project [metaversion]
+  (r/eclipse-project (:jmetaversion metaversion)))
+
+(defn file-infos [version]
+  (r/file-infos (:jmetaversion version)))
+
+(defn revision-number [version]
+  (r/revision-number (:jmetaversion version)))
 
 
+;;Graph filtering
 (defn filter-graph [graph f]
   (defn add-predecessor! [v pred]
     (swap! (:predecessors v) conj pred))
@@ -105,7 +112,7 @@
           non-filtered (remove #(contains? filtered %) succs) ;;contains successors that are filtered as well
           filtered-succs (map #(get filtered %) (filter #(contains? filtered %) succs))
           recursive-succs (mapcat #(collect-successors % filtered) non-filtered)
-          result (concat filtered-succs recursive-succs)]
+          result (set (concat filtered-succs recursive-succs))]
       (do
         (when mapped
           (doall
@@ -113,9 +120,10 @@
         result)))
   
   (defn link-version [version filtered]
-    (let [successors (collect-successors version filtered)]
+    (let [successors (collect-successors version filtered)
+          mapped (get filtered version)]
       (do
-        (successors! version successors))))
+        (successors! mapped successors))))
   
   (let [v (:versions graph)
         filtered (filter-versions v)
@@ -125,7 +133,7 @@
         (map #(link-version % filtered) (keys filtered)))
       (assoc graph 
         :roots (filter #(empty? (predecessors %)) vls)
-        :versions (fn [] vls)))))
+        :versions vls))))
       
   
              

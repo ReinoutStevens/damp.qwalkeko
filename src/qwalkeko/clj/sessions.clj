@@ -73,7 +73,7 @@
   `(fn [graph# ~version next#]
      (logic/project [~version]
                     (logic/all
-                      (graph/ensure-checkouto ~version)
+                      (ensure-checkouto ~version)
                       (set-current ~version)
                       ~@goals
                       (logic/== ~version next#)

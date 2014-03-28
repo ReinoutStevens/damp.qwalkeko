@@ -8,7 +8,8 @@
   (:require [damp.ekeko.workspace.reification :as workspace])
   (:require [damp.ekeko.jdt.ast :as jdt])
   (:import [qwalkeko HistoryProjectModel])
-  (:require [damp.qwal :as qwal]))
+  (:require [damp.qwal :as qwal])
+  (:require [clojure.java.io :as io]))
 
 
 
@@ -47,6 +48,25 @@
     (fileinfo ?fileinfo version)
     (logic/project [?fileinfo]
                    (logic/featurec ?fileinfo {:file ?file}))))
+
+
+(defn fileinfo|maintypename [?fileinfo ?name version]
+  (logic/fresh [?file]
+    (fileinfo|file ?fileinfo ?file version)
+    (logic/project [?file]
+      (logic/== ?name
+        (apply str (take-while #(not (= % \.)) (.getName (io/file ?file))))))))
+
+
+
+(defn fileinfo|compilationunit [?fileinfo ?compilationunit version]
+  (logic/fresh [?typedeclaration ?name ?filename]
+    (fileinfo ?fileinfo version)
+    (fileinfo|maintypename ?fileinfo ?filename version)
+    (jdt/ast :CompilationUnit ?compilationunit)
+    (ast/compilationunit-typedeclaration|main ?compilationunit ?typedeclaration)
+    (jdt/has :name ?typedeclaration ?name)
+    (jdt/name-string|qualified ?name ?filename)))
 
 ;;general version information
 (defn revisionnumber [?number version]

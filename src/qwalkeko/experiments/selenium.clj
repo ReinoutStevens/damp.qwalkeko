@@ -4,7 +4,7 @@
    (:require [qwalkeko.clj.logic :as l])
    (:require [qwalkeko.clj.reification :as r])
    (:require [qwalkeko.clj.graph :as graph])
-
+   (:require [qwalkeko.clj.changenodes :as change])
    (:require [damp.ekeko.jdt
               [ast :as jdt]])
    (:require [damp.qwal :as qwal]))
@@ -183,9 +183,10 @@
                  (fileinfo|selenium ?info))))
 
 
+;;even a filtered graph is way too slow for some projects...
 (defn graph-to-selenium-graph [graph]
   (graph/filter-graph graph
-    (fn [v] (let [infos (r/file-infos v)]
+    (fn [v] (let [infos (graph/file-infos v)]
               (some is-selenium-file? infos)))))
 
 
@@ -204,5 +205,47 @@
 
 
 
-                
-                                   
+(defn find-commit [graph rev-no]
+  (first (filter #(= (graph/revision-number %) rev-no) (:versions graph))))
+
+(comment
+  (def filtered-graph (graph-to-selenium-graph a-graph))
+  (def le-end (find-commit filtered-graph "238d082c6f36b42991c9fcdfe0790fcf15f7e440"))
+  (def le-start (first (graph/predecessors le-end)))
+  (def results 
+   (first (l/qwalkeko 1 [?left ?right]
+            (qwal/qwal filtered-graph le-start le-end [?linfo ?rinfo ?name]
+              (l/in-current [curr]
+                (l/fileinfo ?linfo curr)
+                (fileinfo|selenium ?linfo)
+                (l/fileinfo|maintypename ?linfo ?name curr)
+                (l/fileinfo|compilationunit ?linfo ?left curr))
+              qwal/q=>
+              (l/in-current [curr]
+                (l/fileinfo|edit ?rinfo curr)
+                (l/fileinfo|maintypename ?rinfo ?name curr)
+                (l/fileinfo|compilationunit ?rinfo ?right curr))))))
+  (def left-ast (first results))
+  (def right-ast (second results))
+  (def changes  (qwalkeko.clj.changenodes/get-ast-changes left-ast right-ast)))
+  
+
+
+;;patterns
+;;constant change
+(defn ast|constant [ast]
+  (logic/fresh [?type]
+    (logic/membero ?type (seq '(:NumberLiteral :BooleanLiteral :CharacterLiteral :SimpleName :QualifiedName)))
+    (jdt/ast ?type ast)))
+
+(defn update|constant [change]
+  (logic/fresh [?original ?to]
+    (change/change|update change)
+    (change/change-original change ?original)
+    (change/update-newvalue change ?to)
+    (ast|constant ?original)
+    (ast|constant ?to)))
+    
+
+    
+                                  

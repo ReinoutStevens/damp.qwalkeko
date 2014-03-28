@@ -3,6 +3,7 @@
   (:import [changenodes.operations
             Delete Insert Move Update])
   (:require [clojure.core.logic :as logic])
+  (:require [damp.ekeko.jdt.astnode :as astnode])
   (:require [damp.ekeko.jdt
              [ast :as jdt]]))
 
@@ -44,6 +45,9 @@
     nil
     idx))
 
+(defn convert-property [property]
+  (astnode/ekeko-keyword-for-property-descriptor property))
+
 (defmulti convert-operation class)
 
 (defmethod convert-operation Delete [operation]
@@ -53,20 +57,20 @@
   (make-insert (.getOriginal operation)
                (.getRightParent operation)
                (.getRightNode operation)
-               (.getProperty operation)
+               (convert-property (.getProperty operation))
                (convert-index (.getIndex operation))))
 
 
 (defmethod convert-operation Move [operation]
   (make-move (.getOriginal operation)
              (.getNewParent operation)
-             (.getProperty operation)
+             (convert-property (.getProperty operation))
              (convert-index (.getIndex operation))))
 
 (defmethod convert-operation Update [operation]
   (make-update (.getOriginal operation)
                (.getRightParent operation)
-               (.getProperty operation)))
+               (convert-property (.getProperty operation))))
 
 ;;Clojure Functions
 
@@ -81,11 +85,10 @@
   (seq (.getOperations differencer)))
 
 (def get-ast-changes
-  (memoize 
-    (fn
-      [left-ast right-ast]
-      (let [differencer (make-differencer left-ast right-ast)]
-        (seq (map convert-operation (get-operations (difference differencer))))))))
+  (fn
+    [left-ast right-ast]
+    (let [differencer (make-differencer left-ast right-ast)]
+      (seq (map convert-operation (get-operations (difference differencer)))))))
 
 
 (defn apply-change [change ast]
@@ -96,16 +99,13 @@
 
 ;;Reification
 
-(defn change [?change ?left-ast ?lroot ?rroot]
+(defn change [?change ?lroot ?rroot]
   (logic/fresh [?changes]
              (jdt/ast :CompilationUnit ?lroot)
-             (jdt/ast-root ?left-ast ?lroot)
              (jdt/ast :CompilationUnit ?rroot)
              (logic/project [?lroot ?rroot]
                             (logic/== ?changes (get-ast-changes ?lroot ?rroot)))
-             (logic/membero ?change ?changes)
-             (logic/project [?change]
-                            (logic/featurec ?change {:original ?left-ast}))))
+             (logic/membero ?change ?changes)))
 
 
 (defn change-type [?change ?type]
@@ -113,18 +113,33 @@
     (logic/featurec ?change {:operation ?type})))
 
 
-(defn change|move [?change]
+;;non logical predicates (not the word I am looking for)
+(defn change|move [change]
   (logic/all
-    (change-type ?change :move)))
-    
-(defn moved [?ast ?to]
-  (logic/fresh [?lroot ?rroot]
-               (jdt/ast-root ?ast ?lroot)
-               (ast-corresponding-comp-unit ?ast ?rroot)
-               (change ?ast ?lroot ?rroot)
-               (
-               
-               
+    (change-type change :move)))
+
+(defn change|update [change]
+  (logic/all
+    (change-type change :update)))
+
+(defn change|insert [change]
+  (logic/all
+    (change-type change :insert)))
+
+(defn change|delete [change]
+  (logic/all
+    (change-type change :delete)))
+
+(defn change-original [change ?original]
+  (logic/project [change]
+    (logic/featurec change {:original ?original})))     
+
+(defn update-newvalue [update ?value]
+  (logic/fresh [parent property original]
+    (change|update update)
+    (logic/project [update]
+      (logic/featurec update {:right-parent parent :property property})
+      (jdt/has property parent ?value)))) 
 
 
 ;;Combining changes
@@ -155,8 +170,4 @@
 ;;Zou wss toch niet schalen
 
 
-
-;clojure representatie van een astnode
-(defn make-ast [type properties]
-  {:type type :properties properties})
 

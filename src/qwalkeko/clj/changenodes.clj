@@ -139,7 +139,7 @@
     (change|update update)
     (logic/project [update]
       (logic/featurec update {:right-parent parent :property property})
-      (jdt/has property parent ?value)))) 
+      (jdt/aux property parent ?value)))) 
 
 
 ;;Combining changes

@@ -4,6 +4,7 @@
    (:require [qwalkeko.clj.logic :as l])
    (:require [qwalkeko.clj.reification :as r])
    (:require [qwalkeko.clj.graph :as graph])
+   (:require [qwalkeko.clj.ast :as ast])
    (:require [qwalkeko.clj.changenodes :as change])
    (:require [damp.ekeko.jdt
               [ast :as jdt]])
@@ -248,4 +249,24 @@
     
 
     
-                                  
+(comment
+  (def filtered-graph (graph-to-selenium-graph a-graph))
+  (def le-end (find-commit filtered-graph "72d05a4861ee61f2767b146ae2a520854dff4282"))
+  (def le-start (first (graph/predecessors le-end)))
+  (def results 
+   (l/qwalkeko* [?left ?right]
+     (qwal/qwal filtered-graph le-end le-start [?ltype ?rinfo ?name ?lname]
+       (l/in-current [curr]
+         (l/fileinfo|edit ?rinfo curr)
+         (l/fileinfo|maintypename ?rinfo ?name curr)
+         (logic/== ?name "BaselineGeneBioEntityPageExistingGeneIT")
+         (l/fileinfo|compilationunit ?rinfo ?right curr))
+       qwal/q<=
+       (l/in-current [curr]
+         (jdt/ast :CompilationUnit ?left)
+         (ast/compilationunit-typedeclaration|main ?left ?ltype)
+         (jdt/has :name ?ltype ?lname)
+         (jdt/name-string|qualified ?lname ?name)))))
+  (def left-ast (first results))
+  (def right-ast (second results))
+  (def changes  (qwalkeko.clj.changenodes/get-ast-changes left-ast right-ast)))                  

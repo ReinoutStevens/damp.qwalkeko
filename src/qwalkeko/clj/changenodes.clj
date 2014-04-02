@@ -130,17 +130,27 @@
   (logic/all
     (change-type change :delete)))
 
-(defn change-original [change ?original]
+(defn change|original [change ?original]
   (logic/project [change]
     (logic/featurec change {:original ?original})))     
 
-(defn update-newvalue [update ?value]
+(defn update|newvalue [update ?value]
   (logic/fresh [parent property original]
     (change|update update)
     (logic/project [update]
       (logic/featurec update {:right-parent parent :property property})
       (jdt/aux property parent ?value)))) 
 
+
+
+(defn change|affects-node
+  "Reifies whether the change is "
+  [change ?node]
+  (logic/fresh [?original]
+    (change|original change ?original)
+    (logic/conde
+      [(logic/== ?original ?node)]
+      [(jdt/parent+ ?original ?node)])))
 
 ;;Combining changes
 

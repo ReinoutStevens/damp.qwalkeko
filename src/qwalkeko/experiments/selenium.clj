@@ -7,7 +7,8 @@
    (:require [qwalkeko.clj.ast :as ast])
    (:require [qwalkeko.clj.changenodes :as change])
    (:require [damp.ekeko.jdt
-              [ast :as jdt]])
+              [ast :as jdt]
+              [convenience :as conv]])
    (:require [damp.qwal :as qwal]))
 
 
@@ -242,8 +243,8 @@
 (defn update|constant [change]
   (logic/fresh [?original ?to]
     (change/change|update change)
-    (change/change-original change ?original)
-    (change/update-newvalue change ?to)
+    (change/change|original change ?original)
+    (change/update|newvalue change ?to)
     (ast|constant ?original)
     (ast|constant ?to)))
     
@@ -254,19 +255,35 @@
   (def le-end (find-commit filtered-graph "72d05a4861ee61f2767b146ae2a520854dff4282"))
   (def le-start (first (graph/predecessors le-end)))
   (def results 
-   (l/qwalkeko* [?left ?right]
-     (qwal/qwal filtered-graph le-end le-start [?ltype ?rinfo ?name ?lname]
-       (l/in-current [curr]
-         (l/fileinfo|edit ?rinfo curr)
-         (l/fileinfo|maintypename ?rinfo ?name curr)
-         (logic/== ?name "BaselineGeneBioEntityPageExistingGeneIT")
-         (l/fileinfo|compilationunit ?rinfo ?right curr))
-       qwal/q<=
-       (l/in-current [curr]
-         (jdt/ast :CompilationUnit ?left)
-         (ast/compilationunit-typedeclaration|main ?left ?ltype)
-         (jdt/has :name ?ltype ?lname)
-         (jdt/name-string|qualified ?lname ?name)))))
+   (first 
+     (l/qwalkeko 1 [?left ?right]
+                 (qwal/qwal filtered-graph le-end le-start [?ltype ?rinfo ?name ?lname]
+                   (l/in-current [curr]
+                     (l/fileinfo|edit ?rinfo curr)
+                     (l/fileinfo|maintypename ?rinfo ?name curr)
+                     (logic/== ?name "BaselineGeneBioEntityPageExistingGeneIT")
+                     (l/fileinfo|compilationunit ?rinfo ?right curr))
+                   qwal/q<=
+                   (l/in-current [curr]
+                     (jdt/ast :CompilationUnit ?left)
+                     (ast/compilationunit-typedeclaration|main ?left ?ltype)
+                     (jdt/has :name ?ltype ?lname)
+                     (jdt/name-string|qualified ?lname ?name))))))
   (def left-ast (first results))
   (def right-ast (second results))
-  (def changes  (qwalkeko.clj.changenodes/get-ast-changes left-ast right-ast)))                  
+  (def changes  (change/get-ast-changes left-ast right-ast)))
+
+
+(defn methodinvocation|assert [?x]
+  (logic/all
+    (jdt/ast :MethodInvocation ?x)
+    (logic/conde
+      [(conv/methodinvocation|named ?x "assertThat")]
+      [(conv/methodinvocation|named ?x "assert")])))
+
+
+(defn change|affects-assert [change ?assert]
+  (logic/all
+    (change/change|affects-node change ?assert)
+    (methodinvocation|assert ?assert)))
+

@@ -19,7 +19,7 @@
                  :subname	    +db-path+})
 
 (defn changed-files-query [project-name]
-  ["select path from file where repo_key = ?", project-name])
+  ["select path from selenium where repo_key = ?", project-name])
 
 
 
@@ -29,14 +29,59 @@
                        (changed-files-query project))))
 
 
-
-
-;;
 (defn is-selenium-file? [fileinfo]
-  (let [path (str "/" (:file fileinfo))
+  (let [path (:file fileinfo)
         amount (count (sql/query +db-specs+
-                                 ["select * from file where path = ? limit 1", path]))]
+                        ["select * from selenium where path = ? limit 1", path]))]
     (> amount 0)))
+
+;;Populating database
+(defn add-changed-file [project-name info commit loc]
+  (when-not (is-selenium-file? info)
+    (sql/insert! +db-specs+ "selenium"
+      {:path (:file info) :repo_key project-name
+       :commitno commit :loc loc})))
+;;commit
+;;projectname
+;;numbers of line
+;;
+
+
+(defn populate-version [graph version]
+  (let [results (set (l/qwalkeko* [?info ?cu]
+                       (qwal/qwal graph version version
+                         [?imp ?impname ?str ?package] ;;no actual imps are hurt during the query
+                         (l/in-current [curr]
+                           (logic/conde
+                             [(l/fileinfo|add ?info curr)]
+                             [(l/fileinfo|edit ?info curr)])
+                           (l/fileinfo|compilationunit ?info ?cu curr)
+                           (jdt/child :imports ?cu ?imp)
+                           (jdt/has :name ?imp ?impname)
+                           (jdt/name|qualified-string ?impname ?str)
+                           (logic/project [?str]
+                             (logic/== true (> (.indexOf ?str ".selenium") 0)))))))]
+    (doall
+      (map 
+        (fn [[info cu]]
+          (add-changed-file
+            (graph/graph-project-name graph)
+            info
+            (graph/revision-number version)
+            (count (filter #(= \newline %) (.toString cu)))))
+        results))))
+
+(defn populate-graph [graph]
+  (doall
+    (map 
+      (fn [version]
+        (do
+          (populate-version graph version)
+          (graph/ensure-delete version)))
+      (:versions graph))))
+    
+    
+;;
 
 (defn fileinfo|selenium [fileinfo]
   (logic/project [fileinfo]
@@ -70,13 +115,13 @@
 
 (defn retrieve-file-infos [graph root]
   (l/qwalkeko* [?end ?selenium ?regular]
-               (logic/fresh [?fileinfos]
-                            (qwal/qwal graph root ?end []
-                                       (qwal/q=>*)
-                                       (l/in-current-meta [meta]
-                                                          (l/fileinfos ?fileinfos meta)
-                                                          (logic/project [?fileinfos]
-                                                                         (logic/== [?selenium ?regular] (process-file-infos-clj ?fileinfos '() '()))))))))
+    (logic/fresh [?fileinfos]
+      (qwal/qwal graph root ?end []
+        (qwal/q=>*)
+        (l/in-current-meta [meta]
+          (l/fileinfos ?fileinfos meta)
+          (logic/project [?fileinfos]
+            (logic/== [?selenium ?regular] (process-file-infos-clj ?fileinfos '() '()))))))))
                           
 
   
@@ -261,7 +306,8 @@
                    (l/in-current [curr]
                      (l/fileinfo|edit ?rinfo curr)
                      (l/fileinfo|maintypename ?rinfo ?name curr)
-                     (logic/== ?name "BaselineGeneBioEntityPageExistingGeneIT")
+                     ;(logic/== ?name "BaselineGeneBioEntityPageExistingGeneIT")
+                     (logic/== ?name "GeneQueryExactMatchIT")
                      (l/fileinfo|compilationunit ?rinfo ?right curr))
                    qwal/q<=
                    (l/in-current [curr]

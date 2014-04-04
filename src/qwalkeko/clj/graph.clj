@@ -73,6 +73,10 @@
       predecessoro
       (vals converted))))
 
+
+(defn graph-project-name [a-graph]
+  (.getName (:project a-graph)))
+
 ;;Retrieve information out of versions / graphs
 
 (defn versions [graph]

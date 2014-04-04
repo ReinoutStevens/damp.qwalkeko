@@ -204,6 +204,7 @@ public class MetaVersion {
 	
 	public void closeAndDeleteIfNeeded() throws CoreException{
 		if(eclipseProject != null){
+			damp.util.Natures.removeNature(eclipseProject, EkekoNature.NATURE_ID);
 			eclipseProject.delete(true, false, null);
 			eclipseProject = null;
 			versionRepository = null;

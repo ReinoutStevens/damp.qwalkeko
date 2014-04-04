@@ -150,7 +150,7 @@
     (change|original change ?original)
     (logic/conde
       [(logic/== ?original ?node)]
-      [(jdt/parent+ ?original ?node)])))
+      [(jdt/ast-parent+ ?original ?node)])))
 
 ;;Combining changes
 

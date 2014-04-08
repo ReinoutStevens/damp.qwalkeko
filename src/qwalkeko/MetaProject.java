@@ -8,9 +8,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IProject;
-import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -18,19 +16,8 @@ import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.InvalidRemoteException;
-import org.eclipse.jgit.api.errors.TransportException;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.storage.file.FileRepository;
 
 public class MetaProject {
-	private Git sourceRepository;
-	private Git metaRepository;
-	
-
-
 	private String name;
 	private URI uri;
 	
@@ -65,22 +52,6 @@ public class MetaProject {
 		this.uri = uri;
 	}
 	
-	public void setSourceRepository() throws IOException {
-		File file = new File(uri.toString());
-		Repository rep = new FileRepository(file);
-		this.sourceRepository = new Git(rep);
-	}
-	
-	public Git getSourceRepository() {
-		assert(sourceRepository != null);
-		return sourceRepository;
-	}
-	
-
-	public Git getMetaRepository() {
-		assert(metaRepository != null);
-		return metaRepository;
-	}
 	
 	public void setMetaProduct(MetaProduct metaProduct) {
 		this.metaProduct = metaProduct;
@@ -97,7 +68,6 @@ public class MetaProject {
 				v.initialize(this);
 			}
 			this.findAndSetRoots();
-			this.setSourceRepository();
 			this.createMetaRepository();
 		} catch(Exception e){
 			IStatus status = new Status(IStatus.ERROR, Activator.PLUGIN_ID, e.getMessage(), e);
@@ -153,6 +123,10 @@ public class MetaProject {
 		return versions.get(sha);
 	}
 	
+	public File getMetaRepository(){
+		return new File(eclipseProject.getLocation().toFile(), repositoryDir());
+	}
+	
 	private void createEclipseProjects(){
 		eclipseProject = ResourcesPlugin.getWorkspace().getRoot().getProject(name);
 		//lets ignore this one...
@@ -166,14 +140,15 @@ public class MetaProject {
 		}
 	}
 	
-	private void createMetaRepository() throws InvalidRemoteException, TransportException, GitAPIException, IOException{
-		Repository repo = getSourceRepository().getRepository();
-		File target = new File(eclipseProject.getLocation().toFile(), repositoryDir());
+	private void createMetaRepository() throws IOException, InterruptedException{
+		File target = getMetaRepository();
 		if(!target.exists()){ //if it exists we assume it has been cloned before
-			Git.cloneRepository().setDirectory(target).setURI(uri.toString()).call();
+			String[] cmd = { GitCommands.gitCommand(), "clone", new File(uri.toString()).getParentFile().getAbsolutePath(), target.getAbsolutePath() };
+			Process proc = Runtime.getRuntime().exec(cmd);
+			if(proc.waitFor() != 0){
+				assert(false);
+			}
 		}
-		Repository metaRepo = new FileRepository(target);
-		metaRepository = new Git(metaRepo);
 	}
 	
 	private String repositoryDir(){

@@ -2,15 +2,12 @@ package qwalkeko;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
-import java.util.Date;
 import java.util.TreeSet;
 
 import org.eclipse.core.resources.IProject;
-import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -18,33 +15,12 @@ import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
-import org.eclipse.jgit.api.CheckoutCommand;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.ResetCommand.ResetType;
-import org.eclipse.jgit.api.errors.CheckoutConflictException;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
-import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.FileRepository;
-import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
-import org.xml.sax.Attributes;
-import org.xml.sax.SAXException;
 
 import damp.ekeko.EkekoNature;
-import damp.keko.PPAJavaNature;
 
 //look at ProjectNature
 public class MetaVersion {
 
-	private final String gitCommand = "/usr/local/git/bin/git";
 	private final String revisionNumber; //used as key in some places
 
 	private Collection<String> successorRevisions;
@@ -58,7 +34,6 @@ public class MetaVersion {
 	
 	private MetaProject metaProject;
 	private IProject eclipseProject;
-	private Git versionRepository;
 	
 	public static String retrieveRevisionNoFromProject(IProject project){
 		String name = project.getName();
@@ -183,16 +158,10 @@ public class MetaVersion {
 		File targetLocation = new File(root, getVersionRepositoryLocation());
 		try{
 			if(!targetLocation.exists()){
-				File sourceLocation = metaProject.getMetaRepository().getRepository().getDirectory();
+				File sourceLocation = metaProject.getMetaRepository();
 				doCloneOperation(sourceLocation, targetLocation);
-				initGitRepository();
 				doCheckoutOperation();
-			} else {
-				//we assume we have checked it out before
-				if(versionRepository == null){
-					initGitRepository();
-				}
-			}
+			} 
 		} catch(Exception e){
 			IStatus status = new Status(Status.ERROR, Activator.PLUGIN_ID, e.getMessage(), e);
 			throw new CoreException(status);
@@ -207,18 +176,16 @@ public class MetaVersion {
 			damp.util.Natures.removeNature(eclipseProject, EkekoNature.NATURE_ID);
 			eclipseProject.delete(true, false, null);
 			eclipseProject = null;
-			versionRepository = null;
 		}
 	}
 	
 	private void doCloneOperation(File sourceLocation, File targetLocation) throws IOException, InterruptedException{
 		assert(sourceLocation.exists());
 		assert(!targetLocation.exists());
-		String[] cmd = { gitCommand, "clone", "--shared", sourceLocation.getAbsolutePath(), targetLocation.getAbsolutePath() };
+		String[] cmd = { GitCommands.gitCommand(), "clone", "--shared", sourceLocation.getAbsolutePath(), targetLocation.getAbsolutePath() };
 		Process proc = Runtime.getRuntime().exec(cmd);
 		if(proc.waitFor() != 0){
 			assert(false);
-			//your mother is dead
 		}
 	}
 	
@@ -238,22 +205,11 @@ public class MetaVersion {
 		*/
 		File root = ResourcesPlugin.getWorkspace().getRoot().getLocation().toFile();
 		File targetLocation = new File(root, getVersionRepositoryLocation());
-		String[] cmd = { gitCommand, "checkout", getRevisionNumber() };
+		String[] cmd = { GitCommands.gitCommand(), "checkout", getRevisionNumber() };
 		Process proc = Runtime.getRuntime().exec(cmd, null, targetLocation);
 		if(proc.waitFor() != 0){
 			assert(false);
 		}
-	}
-	
-	public Git getVersionRepository(){
-		return versionRepository;
-	}
-	
-	
-	private void initGitRepository() throws IOException{
-		String location = new File(getVersionRepositoryLocation(), ".git").toString();
-		Repository repo = new FileRepository(location);
-		versionRepository = new Git(repo);
 	}
 	
 	private String getVersionRepositoryLocation(){

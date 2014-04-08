@@ -100,6 +100,8 @@
 (defn revision-number [version]
   (r/revision-number (:jmetaversion version)))
 
+(defn date [version]
+  (r/date (:jmetaversion version)))
 
 ;;Graph filtering
 (defn filter-graph [graph f]

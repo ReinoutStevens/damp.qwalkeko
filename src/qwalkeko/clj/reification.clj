@@ -56,6 +56,8 @@
 (defn predecessors [version]
   (seq (.getPredecessors version)))
 
+(defn date [version]
+  (.getTime version))
 
 (defn was-merged [version]
   (> (count (predecessors version)) 1))

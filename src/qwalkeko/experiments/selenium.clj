@@ -153,7 +153,7 @@
                      (or (not (empty? (filter java-file? s)))
                          (not (empty? (filter java-file? r)))))
                    results)]
-  (sort-by #(.getTime (first %)) filtered)))
+  (sort-by #(graph/date (first %)) filtered)))
 
 (defn process-results [results]
   (defn process-file [file version type file-ids version-ids]

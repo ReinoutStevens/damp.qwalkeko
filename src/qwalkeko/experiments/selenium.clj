@@ -13,15 +13,13 @@
 
 
 
-(def +db-path+  "/Users/resteven/Documents/PhD/mine.db")
+(def +db-path+  "/Users/resteven/Documents/PhD/papers/2014-icpc-seleniumusage/mine.db")
 (def +db-specs+ {:classname  "org.sqlite.JDBC",
                  :subprotocol   "sqlite",
                  :subname	    +db-path+})
 
 (defn changed-files-query [project-name]
   ["select path from selenium where repo_key = ?", project-name])
-
-
 
 
 (defn get-selenium-files [project]
@@ -162,9 +160,9 @@
         (str
           "\""(get file-ids (:file file))"\"" " "
           "\""(get version-ids version)"\"" " "
-          "\""(.getRevisionNumber version)"\"" " "
+          "\""(graph/revision-number version)"\"" " "
           "\""type"\"" " "
-           "\""(.format (java.text.SimpleDateFormat. "yyyy/MM/dd HH:mm") (.getTime (.getTime version)))"\"" " "
+           "\""(.format (java.text.SimpleDateFormat. "yyyy/MM/dd HH:mm") (.getTime (graph/date version)))"\"" " "
            "\""(:file file)"\""))))       
   (defn process-version [[version selenium regular] file-ids version-ids]
     (let [edit-regular (filter #(r/file-info-edited? %) regular)
@@ -200,10 +198,10 @@
 
 ;;2nd try without core.logic
 
-(defn changed-files-clojure [meta-project]
-  (let [versions (.getVersions meta-project)]  
+(defn changed-files-clojure [a-graph]
+  (let [versions (:versions a-graph)]
     (map (fn [v]
-           (let [infos (r/file-infos v)
+           (let [infos (graph/file-infos v)
                  selenium (filter is-selenium-file? infos)
                  regular (filter #(not (is-selenium-file? %)) infos)]
              [v selenium regular]))
@@ -216,7 +214,7 @@
   (def meta-project (first (.getMetaProjects (.getMetaProduct a-model))))
   (def a-graph (graph/convert-project-to-graph meta-project))
   (def a-root (first (:roots a-graph)))
-  (def results (changed-files-clojure meta-project))
+  (def results (changed-files-clojure a-graph))
   (output-results results "/Users/resteven/Desktop/files.csv"))
 
 
@@ -333,3 +331,45 @@
     (change/change|affects-node change ?assert)
     (methodinvocation|assert ?assert)))
 
+
+;;counting changes of selenium files
+
+
+
+(defn count-and-insert-changes [project-name left-ast right-ast info version]
+  (let [commitno (graph/revision-number version)
+        path (:file info)]
+    (unless (> (count (sql/query +db-specs+ 
+                        ["select * from no-changes where commitno = ? and path = ? LIMIT 1", 
+                         commitno, path])) 0)
+      (let [changes (change/get-ast-changes left-ast right-ast)]
+        (sql/insert! +db-specs+ "no_changes"
+          {:path (:file info) :repo_key project-name
+           :commitno (graph/revision-number version) :changes (count changes)})))))
+
+
+
+(defn classify-changes [graph]
+  (defn classify-version [version]
+    (let [preds (graph/predecessors version)
+          results
+          (when-not (empty? preds)
+            (l/qwalkeko* [?assert-change ?info]
+              (qwal/qwal graph version (first preds) [?left-cu ?right-cu ?assert]
+                (l/in-current-meta [curr]
+                  (l/fileinfo|edit ?info curr)
+                  (fileinfo|selenium ?info))
+                (l/in-current [curr]
+                  (l/fileinfo|compilationunit ?info ?right-cu curr))
+                qwal/q<=
+                (l/in-current [curr]
+                  (ast/ast-compilationunit|corresponding ?right-cu ?left-cu)
+                  (change/change ?assert-change ?left-cu ?right-cu)
+                  (change|affects-assert ?assert-change ?assert)))))]
+      (when-not (empty? preds)
+        (graph/ensure-delete (first preds))
+        (graph/ensure-delete version)
+        
+  (let [versions (:versions graph)]
+    (map classify-version versions)))
+    

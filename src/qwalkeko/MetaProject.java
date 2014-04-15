@@ -129,7 +129,6 @@ public class MetaProject {
 	
 	private void createEclipseProjects(){
 		eclipseProject = ResourcesPlugin.getWorkspace().getRoot().getProject(name);
-		//lets ignore this one...
 		try{
 			if(!eclipseProject.exists()){
 				eclipseProject.create(null);

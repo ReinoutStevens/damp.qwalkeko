@@ -13,7 +13,7 @@
 
 
 
-(def +db-path+  "/home/resteven/selenium/db/mine.db")
+(def +db-path+  "/Users/resteven/Documents/PhD/papers/2014-icpc-seleniumusage/mine.db")
 (def +db-specs+ {:classname  "org.sqlite.JDBC",
                  :subprotocol   "sqlite",
                  :subname	    +db-path+})
@@ -336,16 +336,18 @@
 
 
 
-(defn count-and-insert-changes [project-name left-ast right-ast info version]
+(defn count-and-insert-changes [project-name left-ast right-ast info version predecessor]
   (let [commitno (graph/revision-number version)
+        predno (graph/revision-number predecessor)
         path (:file info)]
     (when-not (> (count (sql/query +db-specs+ 
-                          ["select * from no_changes where commitno = ? and path = ? LIMIT 1", 
-                           commitno, path])) 0)
+                          ["select * from no_changes where commitno = ? and path = ? and predecessor = ? LIMIT 1", 
+                           commitno, path, predno])) 0)
       (let [changes (change/get-ast-changes left-ast right-ast)]
         (sql/insert! +db-specs+ "no_changes"
           {:path (:file info) :repo_key project-name
-           :commitno (graph/revision-number version) :changes (count changes)})))))
+           :commitno commitno :changes (count changes)
+           :predecessor predno})))))
 
 
 (defn count-changes [graph]
@@ -353,8 +355,8 @@
     (let [preds (graph/predecessors version)
           results
           (when-not (empty? preds)
-            (l/qwalkeko* [?left-cu ?right-cu ?info]
-              (qwal/qwal graph version (first preds) []
+            (l/qwalkeko* [?left-cu ?right-cu ?info ?end]
+              (qwal/qwal graph version ?end []
                 (l/in-current-meta [curr]
                   (l/fileinfo|edit ?info curr)
                   (fileinfo|selenium ?info))
@@ -368,10 +370,10 @@
           (doall (map graph/ensure-delete preds))
           (graph/ensure-delete version)
           (doall 
-            (map (fn [[left-cu right-cu info]]
+            (map (fn [[left-cu right-cu info end]]
                    (count-and-insert-changes
                      (graph/graph-project-name graph)
-                     left-cu right-cu info version))
+                     left-cu right-cu info version end))
                  results))))
       nil))
   (doall

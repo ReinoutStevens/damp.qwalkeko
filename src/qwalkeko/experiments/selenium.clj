@@ -13,7 +13,7 @@
 
 
 
-(def +db-path+  "/Users/resteven/Documents/PhD/papers/2014-icpc-seleniumusage/mine.db")
+(def +db-path+  "/home/resteven/selenium/db/mine.db")
 (def +db-specs+ {:classname  "org.sqlite.JDBC",
                  :subprotocol   "sqlite",
                  :subname	    +db-path+})
@@ -295,7 +295,7 @@
     
 (comment
   (def filtered-graph (graph-to-selenium-graph a-graph))
-  (def le-end (find-commit filtered-graph "72d05a4861ee61f2767b146ae2a520854dff4282"))
+  (def le-end (find-commit filtered-graph "8b4c3f9a75667a509c4c704a90de1e1dc3ec6f8f"))
   (def le-start (first (graph/predecessors le-end)))
   (def results 
    (first 
@@ -305,7 +305,7 @@
                      (l/fileinfo|edit ?rinfo curr)
                      (l/fileinfo|maintypename ?rinfo ?name curr)
                      ;(logic/== ?name "BaselineGeneBioEntityPageExistingGeneIT")
-                     (logic/== ?name "GeneQueryExactMatchIT")
+                     (logic/== ?name "HeatmapTablePage")
                      (l/fileinfo|compilationunit ?rinfo ?right curr))
                    qwal/q<=
                    (l/in-current [curr]
@@ -339,15 +339,44 @@
 (defn count-and-insert-changes [project-name left-ast right-ast info version]
   (let [commitno (graph/revision-number version)
         path (:file info)]
-    (unless (> (count (sql/query +db-specs+ 
-                        ["select * from no-changes where commitno = ? and path = ? LIMIT 1", 
-                         commitno, path])) 0)
+    (when-not (> (count (sql/query +db-specs+ 
+                          ["select * from no_changes where commitno = ? and path = ? LIMIT 1", 
+                           commitno, path])) 0)
       (let [changes (change/get-ast-changes left-ast right-ast)]
         (sql/insert! +db-specs+ "no_changes"
           {:path (:file info) :repo_key project-name
            :commitno (graph/revision-number version) :changes (count changes)})))))
 
 
+(defn count-changes [graph]
+  (defn classify-version [version]
+    (let [preds (graph/predecessors version)
+          results
+          (when-not (empty? preds)
+            (l/qwalkeko* [?left-cu ?right-cu ?info]
+              (qwal/qwal graph version (first preds) []
+                (l/in-current-meta [curr]
+                  (l/fileinfo|edit ?info curr)
+                  (fileinfo|selenium ?info))
+                (l/in-current [curr]
+                  (l/fileinfo|compilationunit ?info ?right-cu curr))
+                qwal/q<=
+                (l/in-current [curr]
+                  (ast/ast-compilationunit|corresponding ?right-cu ?left-cu)))))]
+      (when-not (empty? preds)
+        (do
+          (doall (map graph/ensure-delete preds))
+          (graph/ensure-delete version)
+          (doall 
+            (map (fn [[left-cu right-cu info]]
+                   (count-and-insert-changes
+                     (graph/graph-project-name graph)
+                     left-cu right-cu info version))
+                 results))))
+      nil))
+  (doall
+    (map classify-version (:versions graph)))
+  nil)
 
 (defn classify-changes [graph]
   (defn classify-version [version]
@@ -367,8 +396,8 @@
                   (change/change ?assert-change ?left-cu ?right-cu)
                   (change|affects-assert ?assert-change ?assert)))))]
       (when-not (empty? preds)
-        (graph/ensure-delete (first preds))
-        (graph/ensure-delete version)
+        (doall (map graph/ensure-delete preds))
+        (graph/ensure-delete version))))
         
   (let [versions (:versions graph)]
     (map classify-version versions)))

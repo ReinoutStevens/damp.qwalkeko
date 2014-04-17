@@ -393,7 +393,7 @@
         (let [changes (change/get-ast-changes left-ast right-ast)]
           (sql/insert! +db-specs+ "no_changes"
             {:path (:file info) :repo_key project-name
-             :commitno commitno :changes (count changes)
+             :commitno commitno :changes changes
              :predecessor predno})))))
  
   (defn classify-version [version]
@@ -413,19 +413,19 @@
                   (change/change ?assert-change ?left-cu ?right-cu)
                   (change|affects-assert ?assert-change ?assert)))))]
       (when-not (empty? preds)
-        (do
+        (let [processed  (reduce (fn [m [change info end]] ;;gives a {:predA {:fileA no-changes :fileB no-changes} :predB ...}
+                                   (update-in m [end info] (fnil inc 0))) {} results)]
           (doall (map graph/ensure-delete preds))
           (graph/ensure-delete version)
-          (doall ;;isn't she loooovely (probably should look into changing this, if processing the results takes more LOC than the actual query)
-            (map (fn [version-changes]
-                   (map (fn [info-changes] ;;list of assertchanges to 1 specific file info
-                          (let [changes (map first info-changes)
-                                info (nth (first info-changes) 1)
-                                pred (nth (first info-changes) 2)]
-                            (write-out-changes (graph/graph-project-name graph) version pred info "assert"))) 
-                          version-changes)
-                   (vals (group-by (fn [[change info end]] info) version-changes))) ;;and now by file
-              (vals (group-by (fn [[change info end]] end) results)))))))) ;;lets group them together by predecessor
+          (doall
+            (map 
+              (fn [pred]
+                (doall
+                  (map (fn [file]
+                         (write-out-changes 
+                           (graph/graph-project-name graph) version pred (assoc-in processed pred file) file "assert")))
+                  (keys (get processed pred)))))
+            (keys processed))))))
   (doall
     (map classify-version (:versions graph))))
     

@@ -380,13 +380,28 @@
     (map classify-version (:versions graph)))
   nil)
 
+
+
 (defn classify-changes [graph]
+  (defn write-out-changes [project-name version predecessor changes info changetype]
+    (let [commitno (graph/revision-number version)
+          predno (graph/revision-number predecessor)
+          path (:file info)]
+      (when-not (> (count (sql/query +db-specs+ 
+                            ["select * from change_classification where commitno = ? and path = ? and predecessor = ? and changetype = ? LIMIT 1", 
+                             commitno, path, predno, changetype])) 0)
+        (let [changes (change/get-ast-changes left-ast right-ast)]
+          (sql/insert! +db-specs+ "no_changes"
+            {:path (:file info) :repo_key project-name
+             :commitno commitno :changes (count changes)
+             :predecessor predno})))))
+ 
   (defn classify-version [version]
     (let [preds (graph/predecessors version)
           results
           (when-not (empty? preds)
-            (l/qwalkeko* [?assert-change ?info]
-              (qwal/qwal graph version (first preds) [?left-cu ?right-cu ?assert]
+            (l/qwalkeko* [?assert-change ?info ?end]
+              (qwal/qwal graph version ?end [?left-cu ?right-cu ?assert]
                 (l/in-current-meta [curr]
                   (l/fileinfo|edit ?info curr)
                   (fileinfo|selenium ?info))
@@ -398,9 +413,19 @@
                   (change/change ?assert-change ?left-cu ?right-cu)
                   (change|affects-assert ?assert-change ?assert)))))]
       (when-not (empty? preds)
-        (doall (map graph/ensure-delete preds))
-        (graph/ensure-delete version))))
-        
-  (let [versions (:versions graph)]
-    (map classify-version versions)))
+        (do
+          (doall (map graph/ensure-delete preds))
+          (graph/ensure-delete version)
+          (doall ;;isn't she loooovely (probably should look into changing this, if processing the results takes more LOC than the actual query)
+            (map (fn [version-changes]
+                   (map (fn [info-changes] ;;list of assertchanges to 1 specific file info
+                          (let [changes (map first info-changes)
+                                info (nth (first info-changes) 1)
+                                pred (nth (first info-changes) 2)]
+                            (write-out-changes (graph/graph-project-name graph) version pred info "assert"))) 
+                          version-changes)
+                   (vals (group-by (fn [[change info end]] info) version-changes))) ;;and now by file
+              (vals (group-by (fn [[change info end]] end) results)))))))) ;;lets group them together by predecessor
+  (doall
+    (map classify-version (:versions graph))))
     

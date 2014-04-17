@@ -13,7 +13,7 @@
 
 
 
-(def +db-path+  "/Users/resteven/Documents/PhD/papers/2014-icpc-seleniumusage/mine.db")
+(def +db-path+  "/home/resteven/selenium/db/mine.db")
 (def +db-specs+ {:classname  "org.sqlite.JDBC",
                  :subprotocol   "sqlite",
                  :subname	    +db-path+})

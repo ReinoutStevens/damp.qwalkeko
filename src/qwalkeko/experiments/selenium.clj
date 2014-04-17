@@ -390,11 +390,10 @@
       (when-not (> (count (sql/query +db-specs+ 
                             ["select * from change_classification where commitno = ? and path = ? and predecessor = ? and changetype = ? LIMIT 1", 
                              commitno, path, predno, changetype])) 0)
-        (let [changes (change/get-ast-changes left-ast right-ast)]
-          (sql/insert! +db-specs+ "no_changes"
-            {:path (:file info) :repo_key project-name
-             :commitno commitno :changes (count changes)
-             :predecessor predno})))))
+        (sql/insert! +db-specs+ "change_classification"
+          {:path (:file info) :repo_key project-name
+           :commitno commitno :changes (count changes)
+           :changetype changetype :predecessor predno}))))
  
   (defn classify-version [version]
     (let [preds (graph/predecessors version)

@@ -422,8 +422,8 @@
                 (doall
                   (map (fn [file]
                          (write-out-changes 
-                           (graph/graph-project-name graph) version pred (assoc-in processed pred file) file "assert")))
-                  (keys (get processed pred))))
+                           (graph/graph-project-name graph) version pred (assoc-in processed pred file) file "assert"))
+                       (keys (get processed pred)))))
               (keys processed)))))))
   (doall
     (map classify-version (:versions graph))))

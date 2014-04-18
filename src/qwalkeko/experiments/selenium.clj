@@ -341,6 +341,23 @@
     (jdt/child :expression ?x ?name)
     (jdt/name|simple-string ?name "By")))
 
+;;@FindBy(something)
+(defn annotation|findBy [?x]
+  (logic/fresh [?name]
+    (jdt/ast :NormalAnnotation ?x)
+    (jdt/has :typeName ?x ?name)
+    (jdt/name|simple-string ?name "FindBy")))
+
+
+(defn change|affects-findBy [change ?find-by]
+  (logic/all
+    (change/change|affects-node change ?find-by)
+    (logic/conde
+      [(methodinvocation|by ?find-by)]
+      [(annotation|findBy ?find-by)])))
+  
+
+
 ;;counting changes of selenium files
 (defn count-and-insert-changes [project-name left-ast right-ast info version predecessor]
   (let [commitno (graph/revision-number version)
@@ -388,7 +405,9 @@
 
 
 
-(defn classify-changes [graph]
+(defn classify-changes [graph change-goal changetype]
+  "change-goal is a logic goal that takes a change as input and should succeed if it is a wanted change.
+   changetype is an identifier for the kind of change, used to write it to the DB"
   (defn write-out-changes [project-name version predecessor changes info changetype]
     (let [commitno (graph/revision-number version)
           predno (graph/revision-number predecessor)
@@ -405,8 +424,8 @@
     (let [preds (graph/predecessors version)
           results
           (when-not (empty? preds)
-            (l/qwalkeko* [?assert-change ?info ?end]
-              (qwal/qwal graph version ?end [?left-cu ?right-cu ?assert]
+            (l/qwalkeko* [?change ?info ?end]
+              (qwal/qwal graph version ?end [?left-cu ?right-cu]
                 (l/in-current-meta [curr]
                   (l/fileinfo|edit ?info curr)
                   (fileinfo|selenium ?info))
@@ -415,8 +434,8 @@
                 qwal/q<=
                 (l/in-current [curr]
                   (ast/ast-compilationunit|corresponding ?right-cu ?left-cu)
-                  (change/change ?assert-change ?left-cu ?right-cu)
-                  (change|affects-assert ?assert-change ?assert)))))]
+                  (change/change ?change ?left-cu ?right-cu)
+                  (change-goal ?change)))))]
       (when-not (empty? preds)
         (let [processed  (reduce (fn [m [change info end]] ;;gives a {:predA {:fileA no-changes :fileB no-changes} :predB ...}
                                    (update-in m [end info] (fnil inc 0))) {} results)]
@@ -428,9 +447,21 @@
                 (doall
                   (map (fn [file]
                          (write-out-changes 
-                           (graph/graph-project-name graph) version pred (assoc-in processed pred file) file "assert"))
+                           (graph/graph-project-name graph) version pred (assoc-in processed pred file) file changetype))
                        (keys (get processed pred)))))
               (keys processed)))))))
   (doall
     (map classify-version (:versions graph))))
     
+
+(defn classify-assert [?change]
+  (logic/fresh [?assert]
+    (change|affects-assert ?change ?assert)))
+
+
+(defn classify-asserts [graph]
+  (classify-changes graph classify-assert "assert"))
+
+(defn classify-findby [?change]
+  (logic/fresh [?findBy]
+    (change|affects-findBy ?change ?findBy)))

@@ -422,7 +422,7 @@
                 (doall
                   (map (fn [file]
                          (write-out-changes 
-                           (graph/graph-project-name graph) version pred (assoc-in processed pred file) file "assert"))
+                           (graph/graph-project-name graph) version pred (get-in processed [pred file]) file "assert"))
                        (keys (get processed pred)))))
               (keys processed)))))))
   (doall

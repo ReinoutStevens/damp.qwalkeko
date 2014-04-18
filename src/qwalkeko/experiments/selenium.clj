@@ -317,7 +317,7 @@
   (def right-ast (second results))
   (def changes  (change/get-ast-changes left-ast right-ast)))
 
-
+;;assert statements
 (defn methodinvocation|assert [?x]
   (logic/all
     (jdt/ast :MethodInvocation ?x)
@@ -332,10 +332,16 @@
     (methodinvocation|assert ?assert)))
 
 
+
+;;By.<something>(value)
+
+(defn methodinvocation|by [?x]
+  (logic/fresh [?name]
+    (jdt/ast :MethodInvocation ?x)
+    (jdt/child :expression ?x ?name)
+    (jdt/name|simple-string ?name "By")))
+
 ;;counting changes of selenium files
-
-
-
 (defn count-and-insert-changes [project-name left-ast right-ast info version predecessor]
   (let [commitno (graph/revision-number version)
         predno (graph/revision-number predecessor)

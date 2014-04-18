@@ -465,3 +465,6 @@
 (defn classify-findby [?change]
   (logic/fresh [?findBy]
     (change|affects-findBy ?change ?findBy)))
+
+(defn classify-findbys [graph]
+  (classify-changes graph classify-findby "findby"))

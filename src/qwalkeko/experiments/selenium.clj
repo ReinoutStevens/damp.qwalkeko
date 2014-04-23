@@ -277,19 +277,7 @@
 
 
 ;;patterns
-;;constant change
-(defn ast|constant [ast]
-  (logic/fresh [?type]
-    (logic/membero ?type (seq '(:NumberLiteral :BooleanLiteral :CharacterLiteral :SimpleName :QualifiedName)))
-    (jdt/ast ?type ast)))
 
-(defn update|constant [change]
-  (logic/fresh [?original ?to]
-    (change/change|update change)
-    (change/change|original change ?original)
-    (change/update|newvalue change ?to)
-    (ast|constant ?original)
-    (ast|constant ?to)))
     
 
     
@@ -358,6 +346,67 @@
   
 
 
+;;changes to PageObject
+(defn classinstancecreation|pageobject [?x]
+  (logic/fresh [?t ?n ?str]
+    (jdt/ast :ClassInstanceCreation ?x)
+    (jdt/has :type ?x ?t)
+    (jdt/has :name ?t ?n)
+    (jdt/name|simple-string ?n ?str)
+    (logic/project [?str]
+      (logic/== true (.endsWith ?str "Page")))))
+
+
+(defn change|affects-pageobject [?change ?pageobject]
+  (logic/all
+    (change/change|affects-node ?change ?pageobject)
+    (classinstancecreation|pageobject ?pageobject)))
+
+
+
+;;changes to Driver
+(defn assignment|driver [?ass]
+  (logic/fresh [?name] 
+    (jdt/ast :Assignment ?ass)
+    (jdt/has :leftHandSide ?ass ?name)
+    (jdt/ast :SimpleName ?name)
+    (jdt/name|simple-string ?name "driver"))) ;;should use binding information (that we dont have) but it looks like driver is a common name
+
+(defn change|affects-driver [?change ?assignment]
+  (logic/all
+    (change/change|affects-node ?change ?assignment)
+    (assignment|driver ?assignment)))
+
+
+;;constant change
+(defn ast|constant [ast]
+  (logic/fresh [?type]
+    (logic/membero ?type (seq '(:NumberLiteral :BooleanLiteral :CharacterLiteral :SimpleName :QualifiedName)))
+    (jdt/ast ?type ast)))
+
+(defn update|constant [change ?constant]
+  (logic/fresh [?original ?to]
+    (change/change|update change)
+    (change/change|original change ?original)
+    (change/update|newvalue change ?to)
+    (ast|constant ?original)
+    (ast|constant ?to)))
+
+
+;;Arguments to Commands
+(defn ast|command [?ast]
+  (logic/fresh [?name]
+    (jdt/ast :MethodInvocation ?ast)
+    (jdt/has :name ?ast ?name)
+    (logic/conde
+      [(jdt/name|simple-string ?name "getAttribute")]
+      [(jdt/name|simple-string ?name "sendKeys")])))
+
+(defn change|affects-command [?change ?command]
+  (logic/all
+    (change/change|affects-node ?change ?command)
+    (ast|command ?command)))
+
 ;;counting changes of selenium files
 (defn count-and-insert-changes [project-name left-ast right-ast info version predecessor]
   (let [commitno (graph/revision-number version)
@@ -404,8 +453,50 @@
   nil)
 
 
+;;classification of changes
 
-(defn classify-changes [graph change-goal changetype]
+;;classification
+(defn classify-assert [?change ?type]
+  (logic/fresh [?assert]
+    (logic/== ?type "assert")
+    (change|affects-assert ?change ?assert)))
+
+
+(defn classify-findby [?change ?type]
+  (logic/fresh [?findBy]
+    (change|affects-findBy ?change ?findBy)
+    (logic/== ?type "findby")))
+
+(defn classify-pageobject [?change ?type]
+  (logic/fresh [?pageobject]
+    (change|affects-pageobject ?change ?pageobject)
+    (logic/== ?type "pageobject")))
+
+(defn classify-constantupdate [?change ?type]
+  (logic/all 
+    (update|constant ?change)
+    (logic/== ?type "constant")))
+
+(defn classify-driver [?change ?type]
+  (logic/fresh [?driver]
+    (change|affects-driver ?change ?driver)
+    (logic/== ?type "driver")))
+
+
+(defn classify-command [?change ?type]
+  (logic/fresh [?command]
+    (change|affects-command ?change ?command)
+    (logic/== ?type "command")))
+
+(defn change-classifier [?change ?type]
+  (logic/conde
+    [(classify-assert ?change ?type)]
+    [(classify-findby ?change ?type)]
+    [(classify-pageobject ?change ?type)]
+    [(classify-constantupdate ?change ?type)]
+    [(classify-command ?change ?type)]))
+
+(defn classify-changes [graph change-goal]
   "change-goal is a logic goal that takes a change as input and should succeed if it is a wanted change.
    changetype is an identifier for the kind of change, used to write it to the DB"
   (defn write-out-changes [project-name version predecessor changes info changetype]
@@ -424,7 +515,7 @@
     (let [preds (graph/predecessors version)
           results
           (when-not (empty? preds)
-            (l/qwalkeko* [?change ?info ?end]
+            (l/qwalkeko* [?change ?info ?end ?type]
               (qwal/qwal graph version ?end [?left-cu ?right-cu]
                 (l/in-current-meta [curr]
                   (l/fileinfo|edit ?info curr)
@@ -435,10 +526,10 @@
                 (l/in-current [curr]
                   (ast/ast-compilationunit|corresponding ?right-cu ?left-cu)
                   (change/change ?change ?left-cu ?right-cu)
-                  (change-goal ?change)))))]
+                  (change-goal ?change ?type)))))]
       (when-not (empty? preds)
-        (let [processed  (reduce (fn [m [change info end]] ;;gives a {:predA {:fileA no-changes :fileB no-changes} :predB ...}
-                                   (update-in m [end info] (fnil inc 0))) {} results)]
+        (let [processed  (reduce (fn [m [change info end type]] ;;gives a {:predA {:fileA {:type no-changes} :fileB {:type no-changes}} :predB ...}
+                                   (update-in m [end info type] (fnil inc 0))) {} results)]
           (doall (map graph/ensure-delete preds))
           (graph/ensure-delete version)
           (doall
@@ -446,25 +537,24 @@
               (fn [pred]
                 (doall
                   (map (fn [file]
-                         (write-out-changes 
-                           (graph/graph-project-name graph) version pred (get-in processed [pred file]) file changetype))
-                       (keys (get processed pred)))))
+                         (doall
+                           (map (fn [changetype]
+                                  (write-out-changes 
+                                    (graph/graph-project-name graph) version pred (get-in processed [pred file changetype]) file changetype)))
+                           (keys (get-in processed [pred file])))) 
+                    (keys (get processed pred)))))
               (keys processed)))))))
   (doall
     (map classify-version (:versions graph))))
-    
-
-(defn classify-assert [?change]
-  (logic/fresh [?assert]
-    (change|affects-assert ?change ?assert)))
 
 
-(defn classify-asserts [graph]
-  (classify-changes graph classify-assert "assert"))
 
-(defn classify-findby [?change]
-  (logic/fresh [?findBy]
-    (change|affects-findBy ?change ?findBy)))
 
-(defn classify-findbys [graph]
-  (classify-changes graph classify-findby "findby"))
+
+
+;;introduce sleep()
+
+;;@Bug, @Ignore, @Test
+
+
+;;Exception

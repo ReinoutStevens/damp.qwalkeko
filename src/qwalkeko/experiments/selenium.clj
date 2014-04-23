@@ -473,8 +473,8 @@
     (logic/== ?type "pageobject")))
 
 (defn classify-constantupdate [?change ?type]
-  (logic/all 
-    (update|constant ?change)
+  (logic/fresh [?constant]
+    (update|constant ?change ?constant)
     (logic/== ?type "constant")))
 
 (defn classify-driver [?change ?type]
@@ -540,8 +540,8 @@
                          (doall
                            (map (fn [changetype]
                                   (write-out-changes 
-                                    (graph/graph-project-name graph) version pred (get-in processed [pred file changetype]) file changetype)))
-                           (keys (get-in processed [pred file])))) 
+                                    (graph/graph-project-name graph) version pred (get-in processed [pred file changetype]) file changetype))
+                             (keys (get-in processed [pred file])))))
                     (keys (get processed pred)))))
               (keys processed)))))))
   (doall

@@ -97,12 +97,18 @@
 
 (defn ast-compilationunit|corresponding [ast ?compunit]
   "finds the corresponding compilationunit of the ast in the current version"
-  (logic/fresh [?root ?path ?leftname ?leftmain ?rightname ?rightmain]
+  (logic/fresh [?root ?path ?leftname ?leftpackage ?leftpname ?leftmain 
+                ?rightname ?rightmain ?rightpackage ?rightpname]
                (logic/project [ast]
                               (jdt/ast-root ast ?root)
+                              (jdt/has :package ast ?leftpackage)
+                              (jdt/has :name ?leftpackage ?leftpname)
                               (compilationunit-typedeclaration|main ?root ?leftmain)
                               (jdt/has :name ?leftmain ?leftname)
                               (jdt/ast :CompilationUnit ?compunit)
+                              (jdt/has :package ?compunit ?rightpackage)
+                              (jdt/has :name ?rightpackage ?rightpname)
+                              (jdt/name-name|same|qualified ?leftpname ?rightpname)
                               (compilationunit-typedeclaration|main ?compunit ?rightmain)
                               (jdt/has :name ?rightmain ?rightname)
                               (jdt/name-name|same|qualified ?leftname ?rightname))))

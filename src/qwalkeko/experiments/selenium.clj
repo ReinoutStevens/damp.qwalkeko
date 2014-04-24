@@ -277,9 +277,6 @@
 
 
 ;;patterns
-
-    
-
     
 (comment
   (def filtered-graph (graph-to-selenium-graph a-graph))
@@ -438,15 +435,14 @@
                 (l/in-current [curr]
                   (ast/ast-compilationunit|corresponding ?right-cu ?left-cu)))))]
       (when-not (empty? preds)
-        (do
-          (doall (map graph/ensure-delete preds))
-          (graph/ensure-delete version)
-          (doall 
-            (map (fn [[left-cu right-cu info end]]
-                   (count-and-insert-changes
-                     (graph/graph-project-name graph)
-                     left-cu right-cu info version end))
-                 results))))
+        (doall (map graph/ensure-delete preds))
+        (graph/ensure-delete version)
+        (doall 
+          (map (fn [[left-cu right-cu info end]]
+                 (count-and-insert-changes
+                   (graph/graph-project-name graph)
+                   left-cu right-cu info version end))
+               results)))
       nil))
   (doall
     (map classify-version (:versions graph)))

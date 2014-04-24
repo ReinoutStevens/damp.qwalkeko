@@ -58,12 +58,30 @@
         (apply str (take-while #(not (= % \.)) (.getName (io/file ?file))))))))
 
 
+(defn fileinfo-package|in [?fileinfo ?package version]
+  (logic/fresh [?fname ?pname ?pstrname]
+    (jdt/ast :PackageDeclaration ?package)
+    (jdt/has :name ?package ?pname)
+    (jdt/name|qualified-string ?pname ?pstrname)
+    (fileinfo|file ?fileinfo ?fname version)
+    (logic/project [?pstrname ?fname]
+      ;;we drop the Class part of the filename and replace / with .
+      ;;we then verify that this string ends with packagename 
+      (logic/== 
+        true
+        (.endsWith
+          (clojure.string/replace
+            (apply str (take (.lastIndexOf ?fname "/") ?fname))
+            \/ \.)
+          ?pstrname)))))
 
 (defn fileinfo|compilationunit [?fileinfo ?compilationunit version]
-  (logic/fresh [?typedeclaration ?name ?filename]
+  (logic/fresh [?typedeclaration ?name ?filename ?package]
     (fileinfo ?fileinfo version)
     (fileinfo|maintypename ?fileinfo ?filename version)
     (jdt/ast :CompilationUnit ?compilationunit)
+    (jdt/has :package ?compilationunit ?package)
+    (fileinfo-package|in ?fileinfo ?package version)
     (ast/compilationunit-typedeclaration|main ?compilationunit ?typedeclaration)
     (jdt/has :name ?typedeclaration ?name)
     (jdt/name-string|qualified ?name ?filename)))

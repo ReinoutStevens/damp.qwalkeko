@@ -13,7 +13,7 @@
 
 
 
-(def +db-path+  "/Users/resteven/Documents/PhD/papers/2014-icpc-seleniumusage/mine.db")
+(def +db-path+  "/home/resteven/selenium/db/mine.db")
 (def +db-specs+ {:classname  "org.sqlite.JDBC",
                  :subprotocol   "sqlite",
                  :subname	    +db-path+})
@@ -393,7 +393,7 @@
 (defn insert|catch [change ?catch]
   (logic/all
     (change/change|insert change)
-    (change/insert|newnode insert ?catch)
+    (change/insert|newnode change ?catch)
     (jdt/ast :CatchClause ?catch)))
 
 
@@ -401,7 +401,7 @@
 (defn insert|annotation [change ?annotation]
   (logic/all
     (change/change|insert change)
-    (change/insert|newnode insert ?annotation)
+    (change/insert|newnode change ?annotation)
     (jdt/ast :MarkerAnnotation ?annotation)))
 
 (defn insert|annotation|test [change ?annotation]
@@ -536,7 +536,7 @@
     [(classify-command ?change ?type)]
     [(classify-annotation-test ?change ?type)]
     [(classify-annotation-ignore ?change ?type)]
-    [(classify-catch ?change ?catch)]))
+    [(classify-catch ?change ?type)]))
 
 (defn classify-changes [graph change-goal]
   "change-goal is a logic goal that takes a change as input and should succeed if it is a wanted change.
@@ -588,3 +588,23 @@
               (keys processed)))))))
   (doall
     (map classify-version (:versions graph))))
+
+;;
+(defn history-model-to-graph [history-model]
+  (let [meta-project (first (.getMetaProjects (.getMetaProduct history-model)))
+        a-graph (graph/convert-project-to-graph meta-project)]
+    a-graph))
+
+
+;;do le magic
+(defn do-selenium-experiment-on-graphs [graphs]
+  (doall
+    (map populate-graph graphs)) ;;this 1 first so if something goes wrong in the next steps we at least have this
+  (println "counting")
+  (doall
+    (map count-changes graphs))
+  (println "classifying")
+  (doall
+    (map classify-changes graphs)))
+  
+  

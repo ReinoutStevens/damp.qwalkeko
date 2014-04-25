@@ -145,7 +145,7 @@
   (logic/all
     (change|insert change)
     (logic/project [insert]
-      (logic/featurerec insert {:right-node ?node}))))
+      (logic/featurec insert {:right-node ?node}))))
 
 
 (defn change|affects-node

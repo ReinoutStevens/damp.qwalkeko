@@ -13,7 +13,7 @@
 
 
 
-(def +db-path+  "/home/resteven/selenium/db/mine.db")
+(def +db-path+  "/Users/resteven/Documents/PhD/papers/2014-icpc-seleniumusage/mine.db")
 (def +db-specs+ {:classname  "org.sqlite.JDBC",
                  :subprotocol   "sqlite",
                  :subname	    +db-path+})
@@ -304,12 +304,11 @@
 
 ;;assert statements
 (defn methodinvocation|assert [?x]
-  (logic/all
+  (logic/fresh [?strname]
     (jdt/ast :MethodInvocation ?x)
-    (logic/conde
-      [(conv/methodinvocation|named ?x "assertThat")]
-      [(conv/methodinvocation|named ?x "assert")])))
-
+    (conv/methodinvocation|named ?x ?strname)
+    (logic/project [?strname]
+      (logic/== true (.startsWith ?strname "assert")))))
 
 (defn change|affects-assert [change ?assert]
   (logic/all
@@ -389,6 +388,34 @@
     (ast|constant ?original)
     (ast|constant ?to)))
 
+
+;;adding try block
+(defn insert|catch [change ?catch]
+  (logic/all
+    (change/change|insert change)
+    (change/insert|newnode insert ?catch)
+    (jdt/ast :CatchClause ?catch)))
+
+
+;;adding @Ignore @Test
+(defn insert|annotation [change ?annotation]
+  (logic/all
+    (change/change|insert change)
+    (change/insert|newnode insert ?annotation)
+    (jdt/ast :MarkerAnnotation ?annotation)))
+
+(defn insert|annotation|test [change ?annotation]
+  (logic/fresh [?name]
+    (insert|annotation change ?annotation)
+    (jdt/has :typeName ?annotation ?name)
+    (jdt/name|simple-string ?name "Test")))
+
+
+(defn insert|annotation|ignore [change ?annotation]
+  (logic/fresh [?name]
+    (insert|annotation change ?annotation)
+    (jdt/has :typeName ?annotation ?name)
+    (jdt/name|simple-string ?name "Ignore")))
 
 ;;Arguments to Commands
 (defn ast|command [?ast]
@@ -484,13 +511,32 @@
     (change|affects-command ?change ?command)
     (logic/== ?type "command")))
 
+(defn classify-annotation-test [?change ?type]
+  (logic/fresh [?annotation]
+    (insert|annotation|test ?change ?annotation)
+    (logic/== ?type "@test")))
+
+
+(defn classify-annotation-ignore [?change ?type]
+  (logic/fresh [?annotation]
+    (insert|annotation|ignore ?change ?annotation)
+    (logic/== ?type "@ignore")))
+
+(defn classify-catch [?change ?type]
+  (logic/fresh [?catch]
+    (insert|catch ?change ?catch)
+    (logic/== ?type "catch")))
+
 (defn change-classifier [?change ?type]
   (logic/conde
     [(classify-assert ?change ?type)]
     [(classify-findby ?change ?type)]
     [(classify-pageobject ?change ?type)]
     [(classify-constantupdate ?change ?type)]
-    [(classify-command ?change ?type)]))
+    [(classify-command ?change ?type)]
+    [(classify-annotation-test ?change ?type)]
+    [(classify-annotation-ignore ?change ?type)]
+    [(classify-catch ?change ?catch)]))
 
 (defn classify-changes [graph change-goal]
   "change-goal is a logic goal that takes a change as input and should succeed if it is a wanted change.
@@ -542,15 +588,3 @@
               (keys processed)))))))
   (doall
     (map classify-version (:versions graph))))
-
-
-
-
-
-
-;;introduce sleep()
-
-;;@Bug, @Ignore, @Test
-
-
-;;Exception

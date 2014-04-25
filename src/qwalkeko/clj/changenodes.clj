@@ -141,6 +141,11 @@
       (logic/featurec update {:right-parent parent :property property})
       (jdt/aux property parent ?value)))) 
 
+(defn insert|newnode [insert ?node]
+  (logic/all
+    (change|insert change)
+    (logic/project [insert]
+      (logic/featurerec insert {:right-node ?node}))))
 
 
 (defn change|affects-node

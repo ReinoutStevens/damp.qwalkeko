@@ -46,13 +46,15 @@
 
 
 (defn populate-version [graph version]
-  (let [results (set (l/qwalkeko* [?info ?cu]
+  ;;we compute infos outside of the logic query as nesting memberos results in a horrible performance
+  (let [infos (seq 
+                (filter (.endWith (r/file-info-path %) ".java")
+                  (filter r/file-info-added? (r/file-infos (:jmetaversion version)))))
+        results (set (l/qwalkeko* [?info ?cu]
                        (qwal/qwal graph version version
                          [?imp ?impname ?str ?package] ;;no actual imps are hurt during the query
                          (l/in-current [curr]
-                           (l/fileinfo|java ?info curr)
-                           (logic/project [?info]
-                               (logic/== :add (:status ?info)))
+                           (logic/membero ?info infos)
                            (logic/onceo (l/fileinfo|compilationunit ?info ?cu curr))
                            (jdt/child :imports ?cu ?imp)
                            (jdt/has :name ?imp ?impname)
@@ -451,16 +453,19 @@
     (let [preds (graph/predecessors version)
           results
           (when-not (empty? preds)
+            (let [infos (seq 
+                          (filter is-selenium-file?
+                          (filter (.endWith (r/file-info-path %) ".java")
+                            (filter r/file-info-edited? (r/file-infos (:jmetaversion version))))))]
             (l/qwalkeko* [?left-cu ?right-cu ?info ?end]
               (qwal/qwal graph version ?end []
                 (l/in-current-meta [curr]
-                  (l/fileinfo|edit ?info curr)
-                  (fileinfo|selenium ?info))
+                  (logic/member ?info infos))
                 (l/in-current [curr]
-                  (l/fileinfo|compilationunit ?info ?right-cu curr))
+                  (logic/onceo (l/fileinfo|compilationunit ?info ?right-cu curr)))
                 qwal/q<=
                 (l/in-current [curr]
-                  (ast/ast-compilationunit|corresponding ?right-cu ?left-cu)))))]
+                  (logic/onceo (ast/ast-compilationunit|corresponding ?right-cu ?left-cu)))))))]
       (when-not (empty? preds)
         (doall (map graph/ensure-delete preds))
         (graph/ensure-delete version)
@@ -557,18 +562,21 @@
     (let [preds (graph/predecessors version)
           results
           (when-not (empty? preds)
-            (l/qwalkeko* [?change ?info ?end ?type]
-              (qwal/qwal graph version ?end [?left-cu ?right-cu]
-                (l/in-current-meta [curr]
-                  (l/fileinfo|edit ?info curr)
-                  (fileinfo|selenium ?info))
-                (l/in-current [curr]
-                  (l/fileinfo|compilationunit ?info ?right-cu curr))
-                qwal/q<=
-                (l/in-current [curr]
-                  (ast/ast-compilationunit|corresponding ?right-cu ?left-cu)
-                  (change/change ?change ?left-cu ?right-cu)
-                  (change-goal ?change ?type)))))]
+            (let [infos (seq 
+                          (filter is-selenium-file?
+                          (filter (.endWith (r/file-info-path %) ".java")
+                            (filter r/file-info-edited? (r/file-infos (:jmetaversion version))))))]
+              (l/qwalkeko* [?change ?info ?end ?type]
+                (qwal/qwal graph version ?end [?left-cu ?right-cu]
+                  (l/in-current-meta [curr]
+                   (logic/membero ?info infos))
+                  (l/in-current [curr]
+                    (logic/onceo (l/fileinfo|compilationunit ?info ?right-cu curr)))
+                  qwal/q<=
+                  (l/in-current [curr]
+                    (logic/onceo (ast/ast-compilationunit|corresponding ?right-cu ?left-cu))
+                    (change/change ?change ?left-cu ?right-cu)
+                    (change-goal ?change ?type))))))]
       (when-not (empty? preds)
         (let [processed  (reduce (fn [m [change info end type]] ;;gives a {:predA {:fileA {:type no-changes} :fileB {:type no-changes}} :predB ...}
                                    (update-in m [end info type] (fnil inc 0))) {} results)]

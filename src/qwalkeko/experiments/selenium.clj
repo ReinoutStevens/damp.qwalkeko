@@ -50,10 +50,10 @@
                        (qwal/qwal graph version version
                          [?imp ?impname ?str ?package] ;;no actual imps are hurt during the query
                          (l/in-current [curr]
-                           (logic/conde
-                             [(l/fileinfo|add ?info curr)]
-                             [(l/fileinfo|edit ?info curr)])
-                           (l/fileinfo|compilationunit ?info ?cu curr)
+                           (l/fileinfo|java ?info curr)
+                           (logic/project [?info]
+                               (logic/== :add (:status ?info)))
+                           (logic/onceo (l/fileinfo|compilationunit ?info ?cu curr))
                            (jdt/child :imports ?cu ?imp)
                            (jdt/has :name ?imp ?impname)
                            (jdt/name|qualified-string ?impname ?str)

@@ -49,6 +49,12 @@
     (logic/project [?fileinfo]
                    (logic/featurec ?fileinfo {:file ?file}))))
 
+(defn fileinfo|java [?fileinfo version]
+  (logic/fresh [?file]
+    (fileinfo|file ?fileinfo ?file version)
+    (logic/project [?file]
+      (logic/== true (.endsWith ?file ".java")))))
+
 
 (defn fileinfo|maintypename [?fileinfo ?name version]
   (logic/fresh [?file]

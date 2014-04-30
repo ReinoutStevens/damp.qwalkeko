@@ -127,7 +127,7 @@
   (= :delete (:status info)))
 
 (defn file-info-path [info]
-  (:path info))
+  (:file info))
 
 (defn file-changed? [path version]
   (let [infos (file-infos version)

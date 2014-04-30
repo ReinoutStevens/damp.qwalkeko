@@ -17,8 +17,10 @@
 ;;Rules over FileInfo
 
 (defn fileinfo [?fileinfo version]
-  (logic/all
-    (logic/membero ?fileinfo (graph/file-infos version))))
+  (logic/conda
+    [(logic/lvaro ?fileinfo)
+     (logic/membero ?fileinfo (graph/file-infos version))]
+    [(logic/nonlvaro ?fileinfo)])) ;;assume this is a fileinfo in current version, membero is too slow
 
 (defn fileinfos [?fileinfos version]
   (logic/all

@@ -48,7 +48,7 @@
 (defn populate-version [graph version]
   ;;we compute infos outside of the logic query as nesting memberos results in a horrible performance
   (let [infos (seq 
-                (filter (.endWith (r/file-info-path %) ".java")
+                (filter #(.endsWith (r/file-info-path %) ".java")
                   (filter r/file-info-added? (r/file-infos (:jmetaversion version)))))
         results (set (l/qwalkeko* [?info ?cu]
                        (qwal/qwal graph version version
@@ -455,12 +455,12 @@
           (when-not (empty? preds)
             (let [infos (seq 
                           (filter is-selenium-file?
-                          (filter (.endWith (r/file-info-path %) ".java")
+                          (filter #(.endWith (r/file-info-path %) ".java")
                             (filter r/file-info-edited? (r/file-infos (:jmetaversion version))))))]
             (l/qwalkeko* [?left-cu ?right-cu ?info ?end]
               (qwal/qwal graph version ?end []
                 (l/in-current-meta [curr]
-                  (logic/member ?info infos))
+                  (logic/membero ?info infos))
                 (l/in-current [curr]
                   (logic/onceo (l/fileinfo|compilationunit ?info ?right-cu curr)))
                 qwal/q<=
@@ -564,7 +564,7 @@
           (when-not (empty? preds)
             (let [infos (seq 
                           (filter is-selenium-file?
-                          (filter (.endWith (r/file-info-path %) ".java")
+                          (filter #(.endWith (r/file-info-path %) ".java")
                             (filter r/file-info-edited? (r/file-infos (:jmetaversion version))))))]
               (l/qwalkeko* [?change ?info ?end ?type]
                 (qwal/qwal graph version ?end [?left-cu ?right-cu]

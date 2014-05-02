@@ -398,6 +398,19 @@
     (change/insert|newnode change ?catch)
     (jdt/ast :CatchClause ?catch)))
 
+;;a) waarom restricteren tot inserts? 
+;;algemener zou zijn je change/change|affects-node te gebruiken
+
+;;b) optioneel: 
+;;kunnen we hier nog checken of de naam van gevangen exception
+;;wel degelijk TimeOutException of StaleElementReferenceException is?
+;;(zonder bindings)
+;;Deze exceptions zijn namelijk te wijten aan het feit dat je met een
+;;verschillende proces aan het communiceren bent (de browser).
+;;Andere exceptions zoals ElementNotFoundException 
+;;geven aan dat de test iets anders verwacht dan het systeem zelf. 
+;;(deze worden normaal niet opgevangen zodat de test faalt).
+
 
 ;;adding @Ignore @Test
 (defn insert|annotation [change ?annotation]
@@ -483,6 +496,9 @@
 
 ;;classification of changes
 
+
+;;hint: using symbols '... or keywords :... instead of strings will save memory
+
 ;;classification
 (defn classify-assert [?change ?type]
   (logic/fresh [?assert]
@@ -534,14 +550,26 @@
 
 (defn change-classifier [?change ?type]
   (logic/conde
-    [(classify-assert ?change ?type)]
-    [(classify-findby ?change ?type)]
-    [(classify-pageobject ?change ?type)]
-    [(classify-constantupdate ?change ?type)]
+    ;we ontbreken een inspection categorie, 
+    ;met calls zoals getAttribute, getText, isVisible op WebElement
+    [(classify-assert ?change ?type)] ;perfect
+    [(classify-findby ?change ?type)] ;perfect, goed dat je op By zoekt ipv findElement
+    [(classify-pageobject ?change ?type)] 
+    ;hmm ... waarom changes aan new-expressions involving Page? 
+    ;denk dat die vrij constant zijn, de methods in zo'n class daarentegen ...
+    ;die weerspiegelen de navigatiestructuur van een website
+    ;hier moeten we eens over synchen, desnoods zou ik deze changes achterwege laten
+    ;aangezien het al change patterns betreft
+    [(classify-constantupdate ?change ?type)] ;perfect
     [(classify-command ?change ?type)]
-    [(classify-annotation-test ?change ?type)]
-    [(classify-annotation-ignore ?change ?type)]
-    [(classify-catch ?change ?type)]))
+    ;this needs to be refined to:  getAttribute is not a command, and several
+    ;user interactions are not caught (e.g., url, back, click) (see Driver for url, Navigation for back etc and WebElement user actions on dom elements)
+
+    [(classify-annotation-test ?change ?type)] ;we are missing Before, BeforeClass, After, AfterClass 
+    [(classify-annotation-ignore ?change ?type)]   ;does not have to be a seperate category 
+    ;;probably easiest to simply find all inserts/deletes/updates of any annotation in the test class
+    
+    [(classify-catch ?change ?type)])) ;should not be limited to insertions (optionally limit to two Selenium-specific exceptions (see predicate definition))
 
 (defn classify-changes [graph change-goal]
   "change-goal is a logic goal that takes a change as input and should succeed if it is a wanted change.

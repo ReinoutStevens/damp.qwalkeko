@@ -292,6 +292,19 @@
     (change/insert|newnode change ?try)
     (jdt/ast :TryStatement ?try)))
 
+;;a) waarom restricteren tot inserts? 
+;;algemener zou zijn je change/change|affects-node te gebruiken
+
+;;b) optioneel: 
+;;kunnen we hier nog checken of de naam van gevangen exception
+;;wel degelijk TimeOutException of StaleElementReferenceException is?
+;;(zonder bindings)
+;;Deze exceptions zijn namelijk te wijten aan het feit dat je met een
+;;verschillende proces aan het communiceren bent (de browser).
+;;Andere exceptions zoals ElementNotFoundException 
+;;geven aan dat de test iets anders verwacht dan het systeem zelf. 
+;;(deze worden normaal niet opgevangen zodat de test faalt).
+
 
 (defn trystatement|timeoutrelated [?try]
   (logic/fresh [?catch ?exception ?type]
@@ -375,6 +388,9 @@
 
 ;;classification of changes
 
+
+;;hint: using symbols '... or keywords :... instead of strings will save memory
+
 ;;classification
 (defn classify-assert [?change ?type]
   (logic/fresh [?assert]
@@ -430,11 +446,11 @@
   (logic/conde
     [(logic/onceo (classify-assert ?change ?type))]
     [(logic/onceo (classify-findby ?change ?type))]
-    [(logic/onceo (classify-pageobject ?change ?type))]
     [(logic/onceo (classify-constantupdate ?change ?type))]
     [(logic/onceo (classify-command ?change ?type))]
     [(logic/onceo (classify-demarcator ?change ?type))]
     [(logic/onceo (classify-exception ?change ?type))]))
+
 
 (defn classify-changes [graph change-goal]
   "change-goal is a logic goal that takes a change as input and should succeed if it is a wanted change.

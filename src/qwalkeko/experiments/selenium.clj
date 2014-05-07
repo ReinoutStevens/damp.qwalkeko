@@ -13,7 +13,7 @@
 
 
 
-(def +db-path+  "/home/resteven/selenium/db/mine.db")
+(def +db-path+  "/Users/resteven/Documents/PhD/papers/2014-icpc-seleniumusage/mine.db")
 (def +db-specs+ {:classname  "org.sqlite.JDBC",
                  :subprotocol   "sqlite",
                  :subname	    +db-path+})
@@ -39,48 +39,16 @@
     (sql/insert! +db-specs+ "selenium"
       {:path (:file info) :repo_key project-name
        :commitno commit :loc loc})))
-;;commit
-;;projectname
-;;numbers of line
-;;
 
 
-(defn populate-version [graph version]
-  ;;we compute infos outside of the logic query as nesting memberos results in a horrible performance
-  (let [infos (seq 
-                (filter #(.endsWith (r/file-info-path %) ".java")
-                  (filter r/file-info-added? (r/file-infos (:jmetaversion version)))))
-        results (set (l/qwalkeko* [?info ?cu]
-                       (qwal/qwal graph version version
-                         [?imp ?impname ?str ?package] ;;no actual imps are hurt during the query
-                         (l/in-current [curr]
-                           (logic/membero ?info infos)
-                           (logic/onceo (l/fileinfo|compilationunit ?info ?cu curr))
-                           (jdt/child :imports ?cu ?imp)
-                           (jdt/has :name ?imp ?impname)
-                           (jdt/name|qualified-string ?impname ?str)
-                           (logic/project [?str]
-                             (logic/== true (> (.indexOf ?str ".selenium") 0)))))))]
-    (doall
-      (map 
-        (fn [[info cu]]
-          (add-changed-file
-            (graph/graph-project-name graph)
-            info
-            (graph/revision-number version)
-            (count (filter #(= \newline %) (.toString cu)))))
-        results))))
-
-(defn populate-graph [graph]
-  (doall
-    (map 
-      (fn [version]
-        (do
-          (populate-version graph version)
-          (graph/ensure-delete version)))
-      (:versions graph))))
-    
-    
+(defn compilationunit|selenium [?cu]
+  (logic/all
+    (jdt/ast :CompilationUnit ?cu)
+    (jdt/child :imports ?cu ?imp)
+    (jdt/has :name ?imp ?impname)
+    (jdt/name|qualified-string ?impname ?str)
+    (logic/project [?str]
+      (logic/== true (> (.indexOf ?str ".selenium") 0)))))
 ;;
 
 (defn fileinfo|selenium [fileinfo]
@@ -222,87 +190,8 @@
 
 
 ;;change patterns
-
-(defn version|modified-selenium [?version]
-  (logic/fresh [?info]
-               (l/fileinfo ?info ?version)
-               (logic/onceo
-                 (fileinfo|selenium ?info))))
-
-
-;;even a filtered graph is way too slow for some projects...
-(defn graph-to-selenium-graph [graph]
-  (graph/filter-graph graph
-    (fn [v] (let [infos (graph/file-infos v)]
-              (some is-selenium-file? infos)))))
-
-
-(defn change-pattern-query [x graph root file]
- (l/qwalkeko x [?info ?end]
-     (qwal/qwal graph root ?end [?info ?changedinfo]
-                (qwal/q=>*)
-                (l/in-current-meta [curr]
-                                   (l/fileinfo|file ?info file curr)
-                                   (l/fileinfo|add ?info curr)
-                                   (fileinfo|selenium ?info))
-                (qwal/q=>+)
-                (l/in-current-meta [curr]
-                                   (l/fileinfo|file ?changedinfo file curr)
-                                   (l/fileinfo|edit ?changedinfo curr)))))
-
-
-
 (defn find-commit [graph rev-no]
   (first (filter #(= (graph/revision-number %) rev-no) (:versions graph))))
-
-(comment
-  (def filtered-graph (graph-to-selenium-graph a-graph))
-  (def le-end (find-commit filtered-graph "238d082c6f36b42991c9fcdfe0790fcf15f7e440"))
-  (def le-start (first (graph/predecessors le-end)))
-  (def results 
-   (first (l/qwalkeko 1 [?left ?right]
-            (qwal/qwal filtered-graph le-start le-end [?linfo ?rinfo ?name]
-              (l/in-current [curr]
-                (l/fileinfo ?linfo curr)
-                (fileinfo|selenium ?linfo)
-                (l/fileinfo|maintypename ?linfo ?name curr)
-                (l/fileinfo|compilationunit ?linfo ?left curr))
-              qwal/q=>
-              (l/in-current [curr]
-                (l/fileinfo|edit ?rinfo curr)
-                (l/fileinfo|maintypename ?rinfo ?name curr)
-                (l/fileinfo|compilationunit ?rinfo ?right curr))))))
-  (def left-ast (first results))
-  (def right-ast (second results))
-  (def changes  (qwalkeko.clj.changenodes/get-ast-changes left-ast right-ast)))
-  
-
-
-;;patterns
-    
-(comment
-  (def filtered-graph (graph-to-selenium-graph a-graph))
-  (def le-end (find-commit filtered-graph "8b4c3f9a75667a509c4c704a90de1e1dc3ec6f8f"))
-  (def le-start (first (graph/predecessors le-end)))
-  (def results 
-   (first 
-     (l/qwalkeko 1 [?left ?right]
-                 (qwal/qwal filtered-graph le-end le-start [?ltype ?rinfo ?name ?lname]
-                   (l/in-current [curr]
-                     (l/fileinfo|edit ?rinfo curr)
-                     (l/fileinfo|maintypename ?rinfo ?name curr)
-                     ;(logic/== ?name "BaselineGeneBioEntityPageExistingGeneIT")
-                     (logic/== ?name "HeatmapTablePage")
-                     (l/fileinfo|compilationunit ?rinfo ?right curr))
-                   qwal/q<=
-                   (l/in-current [curr]
-                     (jdt/ast :CompilationUnit ?left)
-                     (ast/compilationunit-typedeclaration|main ?left ?ltype)
-                     (jdt/has :name ?ltype ?lname)
-                     (jdt/name-string|qualified ?lname ?name))))))
-  (def left-ast (first results))
-  (def right-ast (second results))
-  (def changes  (change/get-ast-changes left-ast right-ast)))
 
 ;;assert statements
 (defn methodinvocation|assert [?x]
@@ -392,108 +281,112 @@
 
 
 ;;adding try block
-(defn insert|catch [change ?catch]
+;;we explicetly use an insert here of a try block as we try to capture
+;;exceptions that are added after people notice timeout exceptions
+;;we dont want to look for changes to nodes that affect a try block, as this will also
+;;capture changes made to the body of a try block, which is unrelated to adding the try
+;;we undershoot here
+(defn insert|try [change ?try]
   (logic/all
     (change/change|insert change)
-    (change/insert|newnode change ?catch)
-    (jdt/ast :CatchClause ?catch)))
+    (change/insert|newnode change ?try)
+    (jdt/ast :TryStatement ?try)))
 
 
-;;adding @Ignore @Test
-(defn insert|annotation [change ?annotation]
+(defn trystatement|timeoutrelated [?try]
+  (logic/fresh [?catch ?exception ?type]
+    (jdt/child :catchClauses ?try ?catch)
+    (jdt/has :exception ?catch ?exception)
+    (jdt/has :type ?exception ?type)
+    (jdt/has :name ?type ?name)
+    (logic/conda
+      [(jdt/name|simple-string ?name "TimeOutException")]
+      [(jdt/name|simple-string ?name "StaleElementReferenceException")]))) ;;perhaps more exceptions should be added here
+
+  
+
+;; @Ignore @Test @BeforeClass @AfterClass
+(defn change|annotation [change ?annotation]
   (logic/all
-    (change/change|insert change)
-    (change/insert|newnode change ?annotation)
+    (change/change|affects-node change ?annotation)
     (jdt/ast :MarkerAnnotation ?annotation)))
 
-(defn insert|annotation|test [change ?annotation]
+(defn change|annotation|test [change ?annotation]
   (logic/fresh [?name]
-    (insert|annotation change ?annotation)
+    (change|annotation change ?annotation)
     (jdt/has :typeName ?annotation ?name)
     (jdt/name|simple-string ?name "Test")))
 
 
-(defn insert|annotation|ignore [change ?annotation]
+(defn change|annotation|ignore [change ?annotation]
   (logic/fresh [?name]
-    (insert|annotation change ?annotation)
+    (change|annotation change ?annotation)
     (jdt/has :typeName ?annotation ?name)
     (jdt/name|simple-string ?name "Ignore")))
 
-;;Arguments to Commands
+(defn change|annotation|beforeclass [change ?annotation]
+  (logic/fresh [?name]
+    (change|annotation change ?annotation)
+    (jdt/has :typeName ?annotation ?name)
+    (jdt/name|simple-string ?name "BeforeClass")))
+
+(defn change|annotation|afterclass [change ?annotation]
+  (logic/fresh [?name]
+    (change|annotation change ?annotation)
+    (jdt/has :typeName ?annotation ?name)
+    (jdt/name|simple-string ?name "AfterClass")))
+
+
+;;Inspectors and Commands
+(defn ast|inspector [?ast]
+  (logic/fresh [?name]
+    (jdt/ast :MethodInvocation ?ast)
+    (jdt/has :name ?ast ?name)
+    (logic/conda
+      [(jdt/name|simple-string ?name "getAttribute")]
+      [(jdt/name|simple-string ?name "getCssValue")]
+      [(jdt/name|simple-string ?name "getSize")]
+      [(jdt/name|simple-string ?name "getTagName")]
+      [(jdt/name|simple-string ?name "getText")]
+      [(jdt/name|simple-string ?name "isDisplayed")]
+      [(jdt/name|simple-string ?name "isEnabled")]
+      [(jdt/name|simple-string ?name "isSelected")])))
+
+(defn change|affects-inspector [?change ?inspector]
+  (logic/all
+    (change/change|affects-node ?change ?inspector)
+    (ast|inspector ?inspector)))
+
+
 (defn ast|command [?ast]
   (logic/fresh [?name]
     (jdt/ast :MethodInvocation ?ast)
     (jdt/has :name ?ast ?name)
-    (logic/conde
-      [(jdt/name|simple-string ?name "getAttribute")]
-      [(jdt/name|simple-string ?name "sendKeys")])))
+    (logic/conda
+      [(jdt/name|simple-string ?name "clear")]
+      [(jdt/name|simple-string ?name "click")]
+      [(jdt/name|simple-string ?name "sendKeys")]
+      [(jdt/name|simple-string ?name "submit")])))
 
 (defn change|affects-command [?change ?command]
   (logic/all
     (change/change|affects-node ?change ?command)
-    (ast|command ?command)))
-
-;;counting changes of selenium files
-(defn count-and-insert-changes [project-name left-ast right-ast info version predecessor]
-  (let [commitno (graph/revision-number version)
-        predno (graph/revision-number predecessor)
-        path (:file info)]
-    (when-not (> (count (sql/query +db-specs+ 
-                          ["select * from no_changes where commitno = ? and path = ? and predecessor = ? LIMIT 1", 
-                           commitno, path, predno])) 0)
-      (let [changes (change/get-ast-changes left-ast right-ast)]
-        (sql/insert! +db-specs+ "no_changes"
-          {:path (:file info) :repo_key project-name
-           :commitno commitno :changes (count changes)
-           :predecessor predno})))))
-
-
-(defn count-changes [graph]
-  (defn classify-version [version]
-    (let [preds (graph/predecessors version)
-          results
-          (when-not (empty? preds)
-            (let [infos (seq 
-                          (filter is-selenium-file?
-                          (filter #(.endWith (r/file-info-path %) ".java")
-                            (filter r/file-info-edited? (r/file-infos (:jmetaversion version))))))]
-            (l/qwalkeko* [?left-cu ?right-cu ?info ?end]
-              (qwal/qwal graph version ?end []
-                (l/in-current-meta [curr]
-                  (logic/membero ?info infos))
-                (l/in-current [curr]
-                  (logic/onceo (l/fileinfo|compilationunit ?info ?right-cu curr)))
-                qwal/q<=
-                (l/in-current [curr]
-                  (logic/onceo (ast/ast-compilationunit|corresponding ?right-cu ?left-cu)))))))]
-      (when-not (empty? preds)
-        (doall (map graph/ensure-delete preds))
-        (graph/ensure-delete version)
-        (doall 
-          (map (fn [[left-cu right-cu info end]]
-                 (count-and-insert-changes
-                   (graph/graph-project-name graph)
-                   left-cu right-cu info version end))
-               results)))
-      nil))
-  (doall
-    (map classify-version (:versions graph)))
-  nil)
-
+    (ast|command ?command0)))
 
 ;;classification of changes
 
 ;;classification
 (defn classify-assert [?change ?type]
   (logic/fresh [?assert]
-    (logic/== ?type "assert")
-    (change|affects-assert ?change ?assert)))
+    (change|affects-assert ?change ?assert)
+    (logic/== ?type "assertion")))
+
 
 
 (defn classify-findby [?change ?type]
   (logic/fresh [?findBy]
     (change|affects-findBy ?change ?findBy)
-    (logic/== ?type "findby")))
+    (logic/== ?type "locator")))
 
 (defn classify-pageobject [?change ?type]
   (logic/fresh [?pageobject]
@@ -510,38 +403,38 @@
     (change|affects-driver ?change ?driver)
     (logic/== ?type "driver")))
 
-
 (defn classify-command [?change ?type]
   (logic/fresh [?command]
     (change|affects-command ?change ?command)
     (logic/== ?type "command")))
 
-(defn classify-annotation-test [?change ?type]
+(defn classify-demarcator [?change ?type]
   (logic/fresh [?annotation]
-    (insert|annotation|test ?change ?annotation)
-    (logic/== ?type "@test")))
+    (logic/conda
+      [(change|annotation|afterclass ?change ?annotation)]
+      [(change|annotation|beforeclass ?change ?annotation)]
+      [(change|annotation|ignore ?change ?annotation)]
+      [(change|annotation|test ?change ?annotation)])
+    (logic/== ?type "demarcator")))
 
 
-(defn classify-annotation-ignore [?change ?type]
-  (logic/fresh [?annotation]
-    (insert|annotation|ignore ?change ?annotation)
-    (logic/== ?type "@ignore")))
-
-(defn classify-catch [?change ?type]
-  (logic/fresh [?catch]
-    (insert|catch ?change ?catch)
-    (logic/== ?type "catch")))
+(defn classify-exception [?change ?type]
+  (logic/fresh [?try]
+    (insert|try ?change ?try)
+    (logic/== ?type "exception")))
 
 (defn change-classifier [?change ?type]
+  ;;onceo is added here as 'change|affects-node' looks in both the original tree and the new tree
+  ;;as a result it could affect an assert statement multiple times
+  ;;(we could also just filter out duplicate results later)
   (logic/conde
-    [(classify-assert ?change ?type)]
-    [(classify-findby ?change ?type)]
-    [(classify-pageobject ?change ?type)]
-    [(classify-constantupdate ?change ?type)]
-    [(classify-command ?change ?type)]
-    [(classify-annotation-test ?change ?type)]
-    [(classify-annotation-ignore ?change ?type)]
-    [(classify-catch ?change ?type)]))
+    [(logic/onceo (classify-assert ?change ?type))]
+    [(logic/onceo (classify-findby ?change ?type))]
+    [(logic/onceo (classify-pageobject ?change ?type))]
+    [(logic/onceo (classify-constantupdate ?change ?type))]
+    [(logic/onceo (classify-command ?change ?type))]
+    [(logic/onceo (classify-demarcator ?change ?type))]
+    [(logic/onceo (classify-exception ?change ?type))]))
 
 (defn classify-changes [graph change-goal]
   "change-goal is a logic goal that takes a change as input and should succeed if it is a wanted change.
@@ -613,6 +506,142 @@
     (map count-changes graphs))
   (println "classifying")
   (doall
-    (map classify-changes graphs)))
+    (map #(classify-changes % change-classifier) graphs)))
+  
+;;counting changes of selenium files
+(defn count-and-insert-changes [project-name left-ast right-ast info version predecessor]
+  (let [commitno (graph/revision-number version)
+        predno (graph/revision-number predecessor)
+        path (:file info)]
+    (when-not (> (count (sql/query +db-specs+ 
+                          ["select * from no_changes where commitno = ? and path = ? and predecessor = ? LIMIT 1", 
+                           commitno, path, predno])) 0)
+      (let [changes (change/get-ast-changes left-ast right-ast)]
+        (sql/insert! +db-specs+ "no_changes"
+          {:path (:file info) :repo_key project-name
+           :commitno commitno :changes (count changes)
+           :predecessor predno})
+        changes))))
+
+
+
+(defn version-selenium-is-computed? [graph version]
+  (> (count (sql/query +db-specs+
+                                ["select * from selenium_computed where repo_key = ? and rev_no = ? limit 1", 
+                                 (graph/graph-project-name graph),
+                                 (graph/revision-number version)])) 0))
+
+(defn selenium-experiment-on-graph [graph] ;;longest method in the history of methods
+  (defn ensure-selenium-files-computed [version]
+    (let [infos (seq 
+                  (filter #(.endsWith (r/file-info-path %) ".java")
+                    (filter r/file-info-edited? (r/file-infos (:jmetaversion version)))))
+          rev-no (graph/revision-number version)]
+      (when-not (version-selenium-is-computed? graph version)
+        (let [results (l/qwalkeko* [?info ?cu]
+                                         (qwal/qwal graph version version
+                                           [?imp ?impname ?str ?package] ;;no actual imps are hurt during the query
+                                           (l/in-current [curr]
+                                             (logic/membero ?info infos)
+                                             (logic/onceo (l/fileinfo|compilationunit ?info ?cu curr))
+                                             (compilationunit|selenium ?cu))))]
+          (doall
+            (map 
+              (fn [[info cu]]
+                (add-changed-file
+                  (graph/graph-project-name graph)
+                  info
+                  (graph/revision-number version)
+                  (count (filter #(= \newline %) (.toString cu)))))
+              results))
+          (sql/insert! +db-specs+ "selenium_computed" {:repo_key (graph/graph-project-name graph) :rev_no (graph/revision-number version)})))))
+          
+  (defn write-out-changes [project-name version predecessor changes info changetype operation]
+    (let [commitno (graph/revision-number version)
+          predno (graph/revision-number predecessor)
+          path (:file info)]
+      (when-not (> (count (sql/query +db-specs+ 
+                            ["select * from change_classification where commitno = ? and path = ? and predecessor = ? and changetype = ? and operation = ? LIMIT 1", 
+                             commitno, path, predno, changetype, operation])) 0)
+        (sql/insert! +db-specs+ "change_classification"
+          {:path (:file info) :repo_key project-name
+           :commitno commitno :changes changes
+           :changetype changetype :predecessor predno
+           :operation operation}))))
   
   
+  (defn classify-version [version]
+    (let [preds (graph/predecessors version)
+          results
+          (when-not (empty? preds)
+            (doall
+              (map ensure-selenium-files-computed (cons version preds)))
+            (let [infos (seq 
+                          (filter is-selenium-file?
+                          (filter #(.endWith (r/file-info-path %) ".java")
+                            (filter r/file-info-edited? (r/file-infos (:jmetaversion version))))))]
+              (l/qwalkeko* [?left-cu ?right-cu ?info ?end]
+                (qwal/qwal graph version ?end []
+                  (l/in-current-meta [curr]
+                    (logic/membero ?info infos))
+                  (l/in-current [curr]
+                    (logic/onceo (l/fileinfo|compilationunit ?info ?right-cu curr)))
+                  qwal/q<=
+                  (l/in-current [curr]
+                    (logic/onceo (ast/ast-compilationunit|corresponding ?right-cu ?left-cu)))))))]
+      (when-not (empty? preds)
+        (doall (map graph/ensure-delete preds))
+        (graph/ensure-delete version)
+        (doall 
+          (map (fn [[left-cu right-cu info end]]
+                 (let [changes 
+                       (count-and-insert-changes
+                         (graph/graph-project-name graph)
+                         left-cu right-cu info version end)
+                       classified
+                       (mapcat classify-change changes)
+                       grouped-together
+                       (reduce (fn [m [change type]]
+                                 (update-in m [type (:operation change)] (fnil inc 0)))
+                         {} changes)]
+                   (doall
+                     (map
+                       (fn [type]
+                         (doall
+                           (map
+                             (fn [operation]
+                               (let [v (get-in grouped-together [type operation])]
+                                 (write-out-changes (graph/graph-project-name graph) version end v info type operation)))
+                             (keys (get type grouped-together)))))
+                       (keys grouped-together)))))
+            nil)))))
+  (doall
+    (map classify-version (:versions graph))))
+
+;;write results to .csv
+
+
+(defn write-out-number-of-changes [path]
+  (defn total-changes [repo-key]
+    (let [changes (apply + (map :changes (sql/query +db-specs+ ["select changes from no_changes where repo_key = ?", repo-key])))] ;;could also do select sum(changes)
+      changes))
+  (defn write-out-change-classification [repo-key]
+        (let [classification  (sql/query +db-specs+ ["select changetype, changes from change_classification where repo_key = ?", repo-key])
+              result (reduce (fn [m e] ;;returns map with key change classification and value the amount
+                               (update-in m [(:changetype e)]
+                                 (fnil (fn [x] (+ (:changes e) x)) 0)))
+                       {} classification)
+              total (total-changes repo-key)]
+          (doall 
+            (for [[k v] result] (println (str "\"" repo-key  "\"" " " "\"" k "\"" " " "\"" (double (/ v total)) "\""))))))
+  
+  (let [repos (map :repo_key (sql/query +db-specs+ "select distinct repo_key from no_changes"))]
+     (with-open [wtr (clojure.java.io/writer (str path))]
+       (binding [*out* wtr]
+         (doall (map write-out-change-classification repos))))
+     
+    nil))
+    
+        
+(comment
+  (write-out-number-of-changes "/Users/resteven/Documents/PhD/papers/2014-icpc-seleniumusage/data/changes.csv"))

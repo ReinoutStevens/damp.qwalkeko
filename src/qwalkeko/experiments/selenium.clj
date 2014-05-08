@@ -455,7 +455,7 @@
           (when-not (empty? preds)
             (let [infos (seq 
                           (filter is-selenium-file?
-                          (filter #(.endWith (r/file-info-path %) ".java")
+                          (filter #(.endsWith (r/file-info-path %) ".java")
                             (filter r/file-info-edited? (r/file-infos (:jmetaversion version))))))]
             (l/qwalkeko* [?left-cu ?right-cu ?info ?end]
               (qwal/qwal graph version ?end []
@@ -564,7 +564,7 @@
           (when-not (empty? preds)
             (let [infos (seq 
                           (filter is-selenium-file?
-                          (filter #(.endWith (r/file-info-path %) ".java")
+                          (filter #(.endsWith (r/file-info-path %) ".java")
                             (filter r/file-info-edited? (r/file-infos (:jmetaversion version))))))]
               (l/qwalkeko* [?change ?info ?end ?type]
                 (qwal/qwal graph version ?end [?left-cu ?right-cu]
@@ -613,6 +613,6 @@
     (map count-changes graphs))
   (println "classifying")
   (doall
-    (map classify-changes graphs)))
+    (map #(classify-changes % change-classifier) graphs)))
   
   

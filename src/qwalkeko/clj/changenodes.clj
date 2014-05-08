@@ -135,11 +135,10 @@
     (logic/featurec change {:original ?original})))     
 
 (defn update|newvalue [update ?value]
-  (logic/fresh [parent property original]
+  (logic/all
     (change|update update)
     (logic/project [update]
-      (logic/featurec update {:right-parent parent :property property})
-      (jdt/aux property parent ?value)))) 
+      (logic/featurec update {:right-parent ?value}))))
 
 (defn insert|newnode [insert ?node]
   (logic/all

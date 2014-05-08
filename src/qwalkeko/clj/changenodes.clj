@@ -135,11 +135,10 @@
     (logic/featurec change {:original ?original})))     
 
 (defn update|newvalue [update ?value]
-  (logic/fresh [parent property original]
+  (logic/all
     (change|update update)
     (logic/project [update]
-      (logic/featurec update {:right-parent parent :property property})
-      (jdt/aux property parent ?value)))) 
+      (logic/featurec update {:right-parent ?value}))))
 
 (defn insert|newnode [insert ?node]
   (logic/all
@@ -147,15 +146,42 @@
     (logic/project [insert]
       (logic/featurec insert {:right-node ?node}))))
 
+(defn move|newparent [move ?node]
+  (logic/all
+    (change|move move)
+    (logic/project [move]
+      (logic/featurec move {:new-parent ?node}))))
 
-(defn change|affects-node
-  "Reifies whether the change is "
+(defn insert|insert-into-node
+  [insert ?node]
+  (logic/fresh [?newnode]
+    (insert|newnode insert ?newnode)
+    (logic/conde
+      [(logic/== ?node ?newnode)]
+      [(jdt/ast-parent+ ?newnode ?node)])))
+
+(defn move|moved-into-node
+  [move ?node]
+  (logic/fresh [?newnode]
+    (move|newparent move ?newnode)
+    (logic/conde
+      [(logic/== ?node ?newnode)]
+      [(jdt/ast-parent+ ?newnode ?node)])))
+
+(defn change|affects-original-node
   [change ?node]
   (logic/fresh [?original]
     (change|original change ?original)
     (logic/conde
       [(logic/== ?original ?node)]
       [(jdt/ast-parent+ ?original ?node)])))
+
+
+(defn change|affects-node [change ?node]
+  (logic/conde
+    [(change|affects-original-node change ?node)]
+    [(move|moved-into-node change ?node)]
+    [(insert|insert-into-node change ?node)]))
 
 ;;Combining changes
 

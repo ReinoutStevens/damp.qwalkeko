@@ -13,7 +13,7 @@
 
 
 
-(def +db-path+  "/Users/resteven/Documents/PhD/papers/2014-icpc-seleniumusage/mine.db")
+(def +db-path+  "/home/resteven/selenium/mine.db")
 (def +db-specs+ {:classname  "org.sqlite.JDBC",
                  :subprotocol   "sqlite",
                  :subname	    +db-path+})
@@ -393,7 +393,6 @@
     (change/change|affects-node ?change ?command)
     (ast|command ?command)))
 
-<<<<<<< HEAD
 ;;counting changes of selenium files
 (defn count-and-insert-changes [project-name left-ast right-ast info version predecessor]
   (let [commitno (graph/revision-number version)
@@ -680,7 +679,7 @@
             results))
         nil)))
   (doall
-    (map #(classify-changes % change-classifier) graphs)))
+    (map classify-version (:versions graph))))
 
 ;;write results to .csv
 

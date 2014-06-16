@@ -87,5 +87,44 @@
           factory="qwalkeko.QwalkekoProjectModelFactory">
     </contributedFactory>
  </extension>
+ <extension
+       point="org.eclipse.ui.menus">
+ </extension>
+ <extension
+       point="org.eclipse.ui.commands">
+    <category
+          id="damp.qwalkeko.commands.category"
+          name="QwalKeko Commands Category">
+    </category>
+    <command
+          categoryId="damp.qwalkeko.commands.category"
+          id="damp.qwalkeko.commands.importRepository"
+          name="Import Repository">
+    </command>
+ </extension>
+ <extension
+       point="org.eclipse.ui.menus">
+    <menuContribution
+          allPopups="false"
+          locationURI="menu:org.eclipse.ui.main.menu&#x0A;">
+       <menu
+             id="damp.qwalkeko.menus.qwalkekoMenu"
+             label="QwalKeko">
+          <command
+                commandId="damp.qwalkeko.commands.importRepository"
+                label="Import Git Repository"
+                style="push"
+                tooltip="Imports and converts a Git Repository">
+          </command>
+       </menu>
+    </menuContribution>
+ </extension>
+ <extension
+       point="org.eclipse.ui.handlers">
+    <handler
+          class="qwalkeko.ImportRepositoryHandler"
+          commandId="damp.qwalkeko.commands.importRepository">
+    </handler>
+ </extension>
 
 </plugin>

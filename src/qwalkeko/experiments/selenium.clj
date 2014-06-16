@@ -13,7 +13,7 @@
 
 
 
-(def +db-path+  "/home/resteven/selenium/mine.db")
+(def +db-path+  "/Users/resteven/Documents/PhD/papers/2014-icpc-seleniumusage/mine.db")
 (def +db-specs+ {:classname  "org.sqlite.JDBC",
                  :subprotocol   "sqlite",
                  :subname	    +db-path+})
@@ -707,3 +707,18 @@
         
 (comment
   (write-out-number-of-changes "/Users/resteven/Documents/PhD/papers/2014-icpc-seleniumusage/data/changes.csv"))
+
+(map
+  (fn [version]
+    (let [results (find-selenium-files version)]
+      (write-results-to-db results)
+      (ensure-delete version)
+      (ensure-delete-predecessors version)))
+  (:versions graph))
+
+
+(defn compilationunit|selenium [?cu]
+  (all
+    (ast* :CompilationUnit ?cu :imports ?imp :name ?impname)
+    (name|qualified-string ?impname ?str)
+    (succeeds (string-contains ?str ".selenium"))))

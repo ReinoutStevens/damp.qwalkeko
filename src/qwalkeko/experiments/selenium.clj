@@ -715,10 +715,3 @@
       (ensure-delete version)
       (ensure-delete-predecessors version)))
   (:versions graph))
-
-
-(defn compilationunit|selenium [?cu]
-  (all
-    (ast* :CompilationUnit ?cu :imports ?imp :name ?impname)
-    (name|qualified-string ?impname ?str)
-    (succeeds (string-contains ?str ".selenium"))))

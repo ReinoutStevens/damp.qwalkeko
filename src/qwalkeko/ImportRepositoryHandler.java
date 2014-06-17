@@ -59,18 +59,19 @@ public class ImportRepositoryHandler extends AbstractHandler {
 					ProcessBuilder pb = new ProcessBuilder("java","-jar", jarString, path, target);
 					Process proc = pb.start();
 					proc.waitFor();
+					damp.util.Natures.addNature(project, HistoryNature.NATURE_ID);
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+					throw new ExecutionException(e.getMessage());
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+					throw new ExecutionException(e.getMessage());
 				} catch (URISyntaxException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+					throw new ExecutionException(e.getMessage());
+				} catch (CoreException e) {
+					throw new ExecutionException(e.getMessage());
 				}
-
 			}
+			System.out.println("Successfully imported project " + projectName);
+			System.out.println("Do not forget to include it to the Ekeko projects");
 		}
 		return null;
 	}

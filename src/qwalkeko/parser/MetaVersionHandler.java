@@ -1,6 +1,5 @@
 package qwalkeko.parser;
 
-import java.io.File;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -12,8 +11,6 @@ import java.util.TreeSet;
 
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
-import org.xml.sax.SAXParseException;
-
 import qwalkeko.ChangedFileInfo;
 import qwalkeko.MetaVersion;
 import qwalkeko.ChangedFileInfo.Status;

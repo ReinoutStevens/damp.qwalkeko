@@ -706,7 +706,7 @@
     
         
 (comment
-  (write-out-number-of-changes "/Users/resteven/Documents/PhD/papers/2014-icpc-seleniumusage/data/changes.csv"))
+  (write-out-number-of-changes "/Users/resteven/Documents/PhD/papers/2014-icpc-seleniumusage/data/changes.csv")
 
 (map
   (fn [version]
@@ -714,4 +714,4 @@
       (write-results-to-db results)
       (ensure-delete version)
       (ensure-delete-predecessors version)))
-  (:versions graph))
+  (:versions graph)))

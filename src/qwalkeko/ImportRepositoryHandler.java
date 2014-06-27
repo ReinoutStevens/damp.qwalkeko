@@ -20,12 +20,7 @@ import org.eclipse.core.runtime.Path;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.FileDialog;
-import org.eclipse.swt.widgets.Shell;
 import org.osgi.framework.Bundle;
-
-import clojure.java.api.*;
-import clojure.lang.IFn;
 
 public class ImportRepositoryHandler extends AbstractHandler {
 

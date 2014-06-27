@@ -1,7 +1,6 @@
 package qwalkeko.parser;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 
@@ -15,8 +14,6 @@ import org.xml.sax.helpers.DefaultHandler;
 import org.xml.sax.helpers.XMLReaderFactory;
 
 import qwalkeko.MetaProduct;
-import qwalkeko.MetaProject;
-import qwalkeko.MetaVersion;
 
 
 public class ScrapperHandler extends DefaultHandler {

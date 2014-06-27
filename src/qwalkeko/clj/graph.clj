@@ -73,6 +73,9 @@
       predecessoro
       (vals converted))))
 
+(defn convert-model-to-graph [history-project-model]
+  (convert-project-to-graph (first (.getMetaProjects (.getMetaProduct history-project-model)))))
+
 
 (defn graph-project-name [a-graph]
   (.getName (:project a-graph)))

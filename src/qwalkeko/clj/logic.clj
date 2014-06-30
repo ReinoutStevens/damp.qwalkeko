@@ -119,3 +119,11 @@
 
 (defmacro in-current [[curr] & goals ]
   `(sessions/vcurrent [~curr] ~@goals))
+
+(defmacro in-git-info [[meta] & goals]
+   `(qwal/qcurrent [~meta] ~@goals))
+
+(defmacro in-source-code [[curr] & goals]
+  `(sessions/vcurrent [~curr] ~@goals))
+
+

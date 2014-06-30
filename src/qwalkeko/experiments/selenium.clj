@@ -53,11 +53,11 @@
 
 (defn fileinfo|selenium [fileinfo]
   (logic/project [fileinfo]
-                 (logic/== true (is-selenium-file? fileinfo))))
+    (logic/== true (is-selenium-file? fileinfo))))
 
 (defn fileinfo|non-selenium [fileinfo]
   (logic/project [fileinfo]
-                 (logic/== false (is-selenium-file? fileinfo))))
+    (logic/== false (is-selenium-file? fileinfo))))
 
 
 (defn process-file-infos [?infos ?selenium ?regular]
@@ -425,7 +425,7 @@
                   (logic/onceo (l/fileinfo|compilationunit ?info ?right-cu curr)))
                 qwal/q<=
                 (l/in-current [curr]
-                  (logic/onceo (ast/ast-compilationunit|corresponding ?right-cu ?left-cu)))))))]
+                  (logic/onceo (ast/compilationunit|corresponding ?right-cu ?left-cu)))))))]
       (when-not (empty? preds)
         (doall (map graph/ensure-delete preds))
         (graph/ensure-delete version)
@@ -533,7 +533,7 @@
                     (logic/onceo (l/fileinfo|compilationunit ?info ?right-cu curr)))
                   qwal/q<=
                   (l/in-current [curr]
-                    (logic/onceo (ast/ast-compilationunit|corresponding ?right-cu ?left-cu))
+                    (logic/onceo (ast/compilationunit|corresponding ?right-cu ?left-cu))
                     (change/change ?change ?left-cu ?right-cu)
                     (change-goal ?change ?type))))))]
       (when-not (empty? preds)
@@ -648,7 +648,7 @@
                     (logic/onceo (l/fileinfo|compilationunit ?info ?right-cu curr)))
                   qwal/q<=
                   (l/in-current [curr]
-                    (logic/onceo (ast/ast-compilationunit|corresponding ?right-cu ?left-cu)))))))]
+                    (logic/onceo (ast/compilationunit|corresponding ?right-cu ?left-cu)))))))]
       (when-not (empty? preds)
         (doall (map graph/ensure-delete preds))
         (graph/ensure-delete version)

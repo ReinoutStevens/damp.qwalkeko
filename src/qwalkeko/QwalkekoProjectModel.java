@@ -1,12 +1,10 @@
 package qwalkeko;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
@@ -18,7 +16,6 @@ import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
-import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.AST;
@@ -27,7 +24,6 @@ import org.eclipse.jdt.core.dom.MethodDeclaration;
 
 
 import damp.ekeko.JavaProjectModel;
-import dk.itu.smartemf.ofbiz.analysis.ControlFlowGraph;
 
 public class QwalkekoProjectModel extends JavaProjectModel {
 

@@ -1,16 +1,18 @@
 # QwalKeko
 
-QwalKeko, formerly known as Scrapper, provides an extension of the logic program querying language [Ekeko](https://github.com/cderoove/damp.ekeko).
+QwalKeko provides an extension of the logic program querying language [Ekeko](https://github.com/cderoove/damp.ekeko).
 It allows developers and researchers to query the history and evolution of software projects stored in a VCS. 
 To this end, QwalKeko constructs a graph of versions, in which each node represents a version, and successive versions are connected. Moving throughout this graph
 is done using [Qwal](https://github.com/ReinoutStevens/damp.qwal), a graph query language implementing regular path expressions.
-Ekeko is used to express the characteristics that have to hold inside each version. Last, QwalKeko provides its own set of "history predicates". For example,
-the predicate ``same/2`` is a predicate that, given a program entity, finds the corresponding program entity in the current version.
+Ekeko is used to express the characteristics that have to hold inside each version. 
+QwalKeko integrates nicely with [ChangeNodes](https://github.com/ReinoutStevens/changenodes), a tree differencer that outputs a minimal edit script.
+It is used in QwalKeko to distill changes made to the source code of the queried software project.
 
 Note that QwalKeko is a research artifact, and is subjected to sudden changes, bugs and features.
 
 
 ## Examples
+
 
 ### Pulled-up Method
 In the first example we find a method ?method that has been moved to ?other-method in a later version. The two first lines provide the setup for our query.
@@ -19,12 +21,12 @@ Lines 3 and 4 are executed in the startversion, and bind ?method to any method i
 Lines 6 and 7 use a predefined rule that detects methods that are moved to another place.
 
 ````clojure
-(logic/run* [?method ?other-method ?successive-version]
+(l/qwalkeko* [?method ?other-method ?successive-version]
    (qwal/qwal graph start-version ?successive-version []
-     (sessions/vcurrent [curr] 
+     (l/in-source-code [curr] 
        (jdt/ast :MethodDeclaration ?method))
      q=>
-     (sessions/vcurrent [curr]
+     (l/in-source-code [curr]
        (refactorings/method-moved ?method ?other-method))))
 ````
 
@@ -49,7 +51,7 @@ In the second example we are looking for sequences of versions in which two auth
     (qwal/q=>*) ;;skip an arbitrary number of versions
     (qwal/qtimes 2 ;;the following has to succeed at least 2 times
       ;;we use qcurrent instead of vcurrent as we only need meta-data, for which we dont have to checkout the version
-      (qwal/qcurrent [curr] 
+      (l/in-git-info [curr] 
         (logic/== ?authorA (.getAuthor curr)))
       qwal/q=>
       (qwal/qcurrent [curr]
@@ -64,17 +66,33 @@ After skipping some versions, we look for a pattern that has to hold a number of
 The pattern binds the author of the current version to ?authorA, transitions to the next version and binds that author to ?authorB.
 We also ensure that both authors are different. Finally we transition to the next version.
 
-## Installation
-Installing QwalKeko is not for the faint of heart, and should/will be streamlined in the future. If you really want to get it up and running here is a brief guide
-of what you have to do, but it is probably easier just to send me an email.
 
-You can clone this repository and import it as an Eclipse plugin project. Note that you will also have to install [Ekeko](https://github.com/cderoove/damp.ekeko/),
-[Keko](https://github.com/ReinoutStevens/damp.keko) and [PPA](http://www.sable.mcgill.ca/ppa/).
-Finally QwalKeko also depends on [ChangeNodes](https://github.com/ReinoutStevens/ChangeNodes), although it is only needed for some features.
+### More examples
+Examples can be found in the experiments and demo folder.
+The two files you want to take a look at are [selenium.clj](https://github.com/ReinoutStevens/damp.qwalkeko/blob/master/src/qwalkeko/experiments/selenium.clj) and [icsme-selenium.clj](https://github.com/ReinoutStevens/damp.qwalkeko/blob/master/src/qwalkeko/demo/icsme_selenium.clj).
+
+
+
+## Installation
+You can clone this repository and import it as an Eclipse plugin project. Note that you will also have to install [Ekeko](https://github.com/cderoove/damp.ekeko/) and [ChangeNodes](https://github.com/ReinoutStevens/changenodes).
+Or more specifically execute the following commands:
+
+````
+cd my/workspace/location
+git clone https://github.com/cderoove/damp.ekeko.git
+git clone https://github.com/ReinoutStevens/damp.qwalkeko.git
+git clone https://github.com/ReinoutStevens/ChangeNodes.git
+````
+
+In Eclipse select Import - Existing Projects and select my/workspace/location as the root directory. Select all the projects and import them.
+If you do not have [Graphical Editing Framework](https://projects.eclipse.org/projects/tools.gef/downloads) (GEF) for Eclipse installed you also have to download that plugin. 
+
+Launching QwalKeko is done by launching it as an Eclipse application.
 
 The next step is getting a local copy of the git repository you want to query. In order to reason about this repository a metadata file must be constructed so that QwalKeko
-can import the repository. This is done by feeding it to `git-scrapper.core/create-product` and `git-scrapper.core/process-product`, which will output an xml-file. This file can
-then be placed in a new eclipse project. Enabling the Ekeko and History nature on this project will enable reasoning about the repository.
+can import the repository. Note that QwalKeko uses system calls for its integration with Git (mainly because the available Git libraries do not support all the needed operations).
+Make sure to point QwalKeko to the correct location by modifying GitCommands.java.
+
 
 
 ## Implementation
@@ -108,8 +126,9 @@ of each version (and thus this goal is called first upon backtracking). This goa
 
 
 ## Additional Reading
-This README still needs to be improved. We have published papers describing our work using QwalKeko, and prior work using Absinthe (a similar idea implemented in SmallTalk, extending SOUL).
+We have published papers describing our work using QwalKeko, and prior work using Absinthe (a similar idea implemented in SmallTalk, extending SOUL).
 
-
+* 
 * [Reasoning over the Evolution of Source Code using Quantified Regular Path Expressions](http://soft.vub.ac.be/Publications/2011/vub-soft-tr-11-13.pdf)
 * [A History Querying Tool and its Application to Detect Multi-version Refactorings](http://soft.vub.ac.be/Publications/2013/vub-soft-tr-13-02.pdf)
+* Prevalence and Maintenance of Automated Functional Tests for Web Application (to be published)

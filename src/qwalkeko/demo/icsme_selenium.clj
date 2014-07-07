@@ -10,7 +10,8 @@
               [convenience :as conv]])
    (:require [damp.qwal :as qwal]))
 
-
+;;;;Video available on QwalKeko's wiki
+;; https://github.com/ReinoutStevens/damp.qwalkeko/wiki/Video-Demonstration
 
 ;;;;Ensure we have properly setup a project
 ;; we will use the motech project for this example

@@ -77,7 +77,9 @@ The two files you want to take a look at are [selenium.clj](https://github.com/R
 
 You can find installation instructions [here](https://github.com/ReinoutStevens/damp.qwalkeko/wiki/Installation).
 
+## Video Demonstration
 
+You can find a video demonstration [here](https://github.com/ReinoutStevens/damp.qwalkeko/wiki/Video-Demonstration).
 
 ## Additional Reading
 We have published papers describing our work using QwalKeko, and prior work using Absinthe (a similar idea implemented in SmallTalk, extending SOUL).

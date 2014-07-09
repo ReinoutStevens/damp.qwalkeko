@@ -107,6 +107,12 @@
                             (logic/== ?changes (get-ast-changes ?lroot ?rroot)))
              (logic/membero ?change ?changes)))
 
+(defn changes [?changes ?lroot ?rroot]
+  (logic/all
+    (jdt/ast :CompilationUnit ?lroot)
+    (jdt/ast :CompilationUnit ?rroot)
+    (logic/project [?lroot ?rroot]
+      (logic/== ?changes (get-ast-changes ?lroot ?rroot)))))
 
 (defn change-type [?change ?type]
   (logic/project [?change]

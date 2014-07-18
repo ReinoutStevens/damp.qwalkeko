@@ -18,7 +18,7 @@
 	
 	
 	       <visibility>
-	          <not><objectState name="nature" value="qwalkeko.historyNature" /></not>
+	          <not><objectState name="nature" value="damp.qwalkeko.plugin.historyNature" /></not>
 	       </visibility>
 	
 	      </objectContribution>
@@ -36,7 +36,7 @@
 	         </action>
 	
 	       <visibility>
-	          <objectState name="nature" value="qwalkeko.historyNature" />
+	          <objectState name="nature" value="dampp.qwalkeko.plugin.historyNature" />
 	       </visibility>	
 		</objectContribution>
    </extension>
@@ -88,9 +88,6 @@
     </contributedFactory>
  </extension>
  <extension
-       point="org.eclipse.ui.menus">
- </extension>
- <extension
        point="org.eclipse.ui.commands">
     <category
           id="damp.qwalkeko.commands.category"
@@ -106,15 +103,14 @@
        point="org.eclipse.ui.menus">
     <menuContribution
           allPopups="false"
-          locationURI="menu:org.eclipse.ui.main.menu&#x0A;">
+          locationURI="menu:damp.ekeko.menus.ekekoMenu?after=additions">
        <menu
              id="damp.qwalkeko.menus.qwalkekoMenu"
              label="QwalKeko">
           <command
                 commandId="damp.qwalkeko.commands.importRepository"
-                label="Import Git Repository"
-                style="push"
-                tooltip="Imports and converts a Git Repository">
+                label="Convert Git Repository"
+                tooltip="Imports and converts a Git repository for QwalKeko">
           </command>
        </menu>
     </menuContribution>

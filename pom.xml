@@ -13,7 +13,7 @@
 	<packaging>pom</packaging>
 	<modules>
 		<module>./damp.qwalkeko.plugin</module>
-		<module>./damp.qwalkeko.test</module>
+		<module>./damp.qwalkeko.plugin.test</module>
 		<module>./damp.qwalkeko.feature</module>
 	</modules>
 

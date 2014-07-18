@@ -10,9 +10,9 @@ Require-Bundle: org.eclipse.jdt.core,
  org.eclipse.core.runtime,
  org.eclipse.core.resources;bundle-version="3.7.101",
  org.eclipse.team.core;bundle-version="3.6.0",
- ChangeNodes;bundle-version="1.0.0",
  damp.libs;bundle-version="2.0.9",
- damp.ekeko.plugin;bundle-version="2.0.9"
+ damp.ekeko.plugin;bundle-version="2.0.9",
+ damp.changenodes.plugin;bundle-version="1.0.0"
 Bundle-ActivationPolicy: lazy
 Bundle-RequiredExecutionEnvironment: JavaSE-1.6
 Export-Package: qwalkeko,

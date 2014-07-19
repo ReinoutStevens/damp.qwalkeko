@@ -27,9 +27,9 @@
       <import plugin="org.eclipse.core.runtime"/>
       <import plugin="org.eclipse.core.resources" version="3.7.101" match="greaterOrEqual"/>
       <import plugin="org.eclipse.team.core" version="3.6.0" match="greaterOrEqual"/>
-      <import plugin="ChangeNodes" version="1.0.0" match="greaterOrEqual"/>
       <import plugin="damp.libs" version="2.0.9" match="greaterOrEqual"/>
       <import plugin="damp.ekeko.plugin" version="2.0.9" match="greaterOrEqual"/>
+      <import plugin="damp.changenodes.plugin" version="1.0.0" match="greaterOrEqual"/>
    </requires>
 
    <plugin

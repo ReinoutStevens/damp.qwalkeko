@@ -16,7 +16,10 @@ Require-Bundle: org.eclipse.jdt.core,
 Bundle-ActivationPolicy: lazy
 Bundle-RequiredExecutionEnvironment: JavaSE-1.6
 Export-Package: qwalkeko,
+ qwalkeko.changedistiller,
  qwalkeko.clj,
+ qwalkeko.demo,
+ qwalkeko.experiments,
  qwalkeko.parser
 Eclipse-RegisterBuddy: damp.ekeko.plugin
 Bundle-ClassPath: lib/changedistiller-0.0.1-SNAPSHOT-jar-with-dependencies.jar,

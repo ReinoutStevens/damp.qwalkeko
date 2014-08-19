@@ -36,7 +36,7 @@
 	         </action>
 	
 	       <visibility>
-	          <objectState name="nature" value="dampp.qwalkeko.plugin.historyNature" />
+	          <objectState name="nature" value="damp.qwalkeko.plugin.historyNature" />
 	       </visibility>	
 		</objectContribution>
    </extension>

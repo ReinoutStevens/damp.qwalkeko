@@ -1,0 +1,34 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: QwalKeko Eclipse Pugin
+Bundle-SymbolicName: damp.qwalkeko.plugin;singleton:=true
+Bundle-Version: 1.0.0.qualifier
+Bundle-Activator: qwalkeko.Activator
+Require-Bundle: org.eclipse.ui,
+ org.eclipse.core.runtime,
+ org.eclipse.core.resources,
+ org.eclipse.team.core;bundle-version="3.6.0",
+ damp.libs;bundle-version="2.0.9",
+ damp.ekeko.plugin;bundle-version="2.0.9",
+ damp.changenodes.plugin;bundle-version="1.0.0",
+ org.eclipse.jdt.core,
+ org.eclipse.core.filesystem;bundle-version="1.4.100"
+Bundle-ActivationPolicy: lazy
+Bundle-RequiredExecutionEnvironment: JavaSE-1.7
+Export-Package: qwalkeko,
+ qwalkeko.changedistiller,
+ qwalkeko.clj,
+ qwalkeko.demo,
+ qwalkeko.experiments,
+ qwalkeko.parser
+Eclipse-RegisterBuddy: damp.ekeko.plugin, damp.libs
+Bundle-ClassPath: .,
+ lib/changedistiller-0.0.1-SNAPSHOT-jar-with-dependencies.jar,
+ lib/commons-lang3-3.1.jar,
+ lib/core.cache-0.5.0.jar,
+ lib/core.memoize-0.5.1.jar,
+ lib/data.xml-0.0.6.jar,
+ lib/dsabanin-clj-jgit-0.1.3.jar,
+ lib/git-scrapper-1.0.0.jar,
+ lib/jsch-0.1.44-1.jar,
+ lib/tools.cli-0.2.2.jar

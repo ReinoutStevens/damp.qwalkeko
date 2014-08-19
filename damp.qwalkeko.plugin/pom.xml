@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <relativePath>../pom.xml</relativePath>
+    <groupId>damp.qwalkeko</groupId>
+    <artifactId>damp.qwalkeko</artifactId>
+	<version>1.0.0-SNAPSHOT</version> <!-- bump this -->
+  </parent>
+
+  <artifactId>damp.qwalkeko.plugin</artifactId>
+  <packaging>eclipse-plugin</packaging>
+  <version>1.0.0-SNAPSHOT</version>
+  <groupId>damp.qwalkeko</groupId>
+</project> 

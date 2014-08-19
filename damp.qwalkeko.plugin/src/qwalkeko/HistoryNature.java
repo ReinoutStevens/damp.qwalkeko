@@ -8,7 +8,7 @@ import org.eclipse.core.runtime.CoreException;
 
 public class HistoryNature implements IProjectNature{
 	
-	public static final String NATURE_ID = "qwalkeko.historyNature";
+	public static final String NATURE_ID = Activator.PLUGIN_ID + ".historyNature";
 
 	private IProject project;
 

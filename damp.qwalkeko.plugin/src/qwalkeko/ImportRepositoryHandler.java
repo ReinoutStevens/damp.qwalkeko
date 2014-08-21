@@ -46,7 +46,8 @@ public class ImportRepositoryHandler extends AbstractHandler {
 					throw new ExecutionException(e.getMessage());
 				}
 				try {
-					Bundle bundle = Platform.getBundle("qwalkeko");
+					Bundle bundle = Platform.getBundle(Activator.PLUGIN_ID);
+					assert(bundle != null);
 					IPath jarPath = new Path("lib/git-scrapper-1.0.0.jar");
 					URL jarURL = FileLocator.find(bundle, jarPath, null);
 					String jarString = FileLocator.getBundleFile(bundle).getAbsolutePath() + jarURL.toURI().getPath();

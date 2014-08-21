@@ -6,7 +6,7 @@ import org.eclipse.core.runtime.CoreException;
 
 public class QwalkekoNature implements IProjectNature{
 	
-	public static final String NATURE_ID = Activator.PLUGIN_ID +  ".qwalkekoNature";
+	public static final String NATURE_ID = Activator.PLUGIN_ID + ".qwalkekoNature";
 
 	private IProject project;
 

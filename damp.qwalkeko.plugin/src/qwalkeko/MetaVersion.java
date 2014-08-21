@@ -161,6 +161,8 @@ public class MetaVersion {
 				File sourceLocation = metaProject.getMetaRepository();
 				doCloneOperation(sourceLocation, targetLocation);
 				doCheckoutOperation();
+				//eclipse does silly things when a .git is present, especially when you delete that folder later
+				deleteGitFolder(); 
 			} 
 		} catch(Exception e){
 			IStatus status = new Status(Status.ERROR, Activator.PLUGIN_ID, e.getMessage(), e);
@@ -212,6 +214,13 @@ public class MetaVersion {
 		}
 	}
 	
+	private void deleteGitFolder() {
+		File root = ResourcesPlugin.getWorkspace().getRoot().getLocation().toFile();
+		File targetLocation = new File(root, getVersionRepositoryLocation());
+		File gitLocation = new File(targetLocation, ".git");
+		deleteDir(gitLocation);
+	}
+	
 	private String getVersionRepositoryLocation(){
 		return metaProject.getName() + "-" + this.getRevisionNumber();
 	}
@@ -238,14 +247,26 @@ public class MetaVersion {
 			}
 			try {
 				Job.getJobManager().join(ResourcesPlugin.FAMILY_AUTO_BUILD, null);
-			} catch (OperationCanceledException e) {
+			} catch (OperationCanceledException | InterruptedException e) {
 				e.printStackTrace();
-			} catch (InterruptedException e) {
-				e.printStackTrace();
+				return;
 			}
 		} catch(CoreException e){
 			e.printStackTrace();
 		}
+	}
+	
+	private boolean deleteDir(File dir) { 
+	  if (dir.isDirectory()) { 
+		  String[] children = dir.list(); 
+		  for (int i=0; i<children.length; i++) { 
+			  boolean success = deleteDir(new File(dir, children[i])); 
+			  if (!success) {  
+				  return false; 
+			  } 
+		  }
+	  }	
+	  return dir.delete(); 
 	}
 	
 }

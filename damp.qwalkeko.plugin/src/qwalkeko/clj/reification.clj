@@ -78,6 +78,8 @@
 (defn revision-number [version]
   (.getRevisionNumber version))
 
+(defn commit-message [version]
+  (.getCommitMessage version))
 ;;EclipseProject
 
 (defn open [version]

@@ -132,3 +132,8 @@
       [(methodinvocation|by ?find-by)]
       [(annotation|findBy ?find-by)])))
   
+(def findbys
+  (logic/run* [?change]
+    (logic/fresh [?findBy]
+      (logic/membero ?change changes)
+      (change|affects-findBy ?change ?findBy))))

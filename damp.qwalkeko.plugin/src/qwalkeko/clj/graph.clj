@@ -106,6 +106,9 @@
 (defn date [version]
   (r/date (:jmetaversion version)))
 
+(defn commit-message [version]
+  (r/commit-message (:jmetaversion version)))
+
 ;;Graph filtering
 (defn filter-graph [graph f]
   (defn add-predecessor! [v pred]

@@ -48,7 +48,7 @@ public class ImportRepositoryHandler extends AbstractHandler {
 				try {
 					Bundle bundle = Platform.getBundle(Activator.PLUGIN_ID);
 					assert(bundle != null);
-					IPath jarPath = new Path("lib/git-scrapper-1.0.0.jar");
+					IPath jarPath = new Path("lib/git-scrapper-1.0.1.jar");
 					URL jarURL = FileLocator.find(bundle, jarPath, null);
 					String jarString = FileLocator.getBundleFile(bundle).getAbsolutePath() + jarURL.toURI().getPath();
 					String target = project.getFile("project.xml").getLocation().toString();

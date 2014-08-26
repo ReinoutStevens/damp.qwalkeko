@@ -88,3 +88,6 @@ We have published papers describing our work using QwalKeko, and prior work usin
 * [Reasoning over the Evolution of Source Code using Quantified Regular Path Expressions](http://soft.vub.ac.be/Publications/2011/vub-soft-tr-11-13.pdf)
 * [A History Querying Tool and its Application to Detect Multi-version Refactorings](http://soft.vub.ac.be/Publications/2013/vub-soft-tr-13-02.pdf)
 * Prevalence and Maintenance of Automated Functional Tests for Web Application (to be published)
+ 
+## Slides
+You can find most of my presentations on [Slideshare](http://www.slideshare.net/stevensreinout).

@@ -120,7 +120,7 @@ public class QwalkekoProjectModel extends JavaProjectModel {
 	
 	
 	private CompilationUnit parse(String str, IPath location) {
-		ASTParser parser = ASTParser.newParser(AST.JLS4);
+		ASTParser parser = ASTParser.newParser(AST.JLS8);
 		parser.setSource(str.toCharArray());
 		parser.setKind(ASTParser.K_COMPILATION_UNIT);
 		parser.setUnitName(location.toString());

@@ -51,7 +51,7 @@
 (defmulti convert-operation class)
 
 (defmethod convert-operation Delete [operation]
-  (make-delete (.getAffectedNode operation)))
+  (make-delete (.getOriginal operation)))
 
 (defmethod convert-operation Insert [operation]
   (make-insert (.getOriginal operation)

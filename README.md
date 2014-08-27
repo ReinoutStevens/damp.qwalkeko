@@ -50,12 +50,12 @@ In the second example we are looking for sequences of versions in which two auth
   (qwal/qwal graph root ?end []
     (qwal/q=>*) ;;skip an arbitrary number of versions
     (qwal/qtimes 2 ;;the following has to succeed at least 2 times
-      ;;we use qcurrent instead of vcurrent as we only need meta-data, for which we dont have to checkout the version
+      ;;we use in-git-info instead of in-source-code as we only need meta-data, for which we dont have to checkout the version
       (l/in-git-info [curr] 
-        (logic/== ?authorA (.getAuthor curr)))
+        (logic/== ?authorA (author curr)))
       qwal/q=>
-      (qwal/qcurrent [curr]
-        (logic/== ?authorB (.getAuthor curr))
+      (qwal/in-git-info [curr]
+        (logic/== ?authorB (author curr))
         (logic/!= ?authorA ?authorB)) ;;ensure both authors are different
       qwal/q=>)))
 ````

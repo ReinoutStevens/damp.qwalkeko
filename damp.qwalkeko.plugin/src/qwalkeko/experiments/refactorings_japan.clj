@@ -110,20 +110,38 @@
     (change/update-property change :body)))
 
 
-(defn changes-extract-method-from [changes ?method ?from ?insert-change ?from-change]
-  (logic/fresh [?methodname ?methodcall ?methodcallname]
-    (logic/membero ?insert-change changes)
-    (change-method-inserted ?insert-change ?method)
-    (jdt/has :name ?method ?methodname)
-    (logic/membero ?from-change changes)
-    (change/change|insert ?from-change)
-    (change/change-affects-new-node ?from-change ?from)
-    (jdt/ast :MethodDeclaration ?from)
-    (change/change-contains-new-node ?from-change ?methodcall)
-    (jdt/ast :MethodInvocation ?methodcall)
-    (jdt/has :name ?methodcall ?methodcallname)
-    (jdt/name|simple-name|simple|same ?methodcallname ?methodname)))
+(defn changes-extract-method-deleting-inserting [changes ?extracted ?deleting ?inserting ]
+  (logic/fresh [?methodname ?methodinvoc ?methodcallname ?insert-change ?insert-into]
+    (damp.ekeko.logic/contains changes ?insert-change)
+    (change-method-inserted ?insert-change ?extracted)
+    (jdt/has :name ?extracted ?methodname)
+    (damp.ekeko.logic/contains changes ?inserting)
+    (change/change|insert ?inserting)
+    (change/change-affects-original-node ?inserting ?insert-into)
+    (jdt/ast :MethodDeclaration ?insert-into)
+    (change/change-contains-new-node ?inserting ?methodinvoc)
+    (jdt/ast :MethodInvocation ?methodinvoc)
+    (jdt/has :name ?methodinvoc ?methodcallname)
+    (jdt/name|simple-name|simple|same ?methodcallname ?methodname)
+    (damp.ekeko.logic/contains changes ?deleting)
+    (change/change|delete ?deleting)
+    (change/change-affects-original-node ?deleting ?insert-into)
+    ;;we should add something that verifies that the inserted code and deleting code is similar
+    ))
 
 
-
-    
+(defn changes-extract-method-updating [changes ?extracted ?updating]
+  (logic/fresh [?methodname ?methodinvoc ?methodcallname ?updated-method ?insert-change]
+    (damp.ekeko.logic/contains changes ?insert-change)
+    (change-method-inserted ?insert-change ?extracted)
+    (jdt/has :name ?extracted ?methodname)
+    (damp.ekeko.logic/contains changes ?updating)
+    (change/change|update ?updating)
+    (change/change-affects-original-node ?updating ?updated-method)
+    (jdt/ast :MethodDeclaration ?updated-method)
+    (change/change-contains-new-node ?updating ?methodinvoc)
+    (jdt/ast :MethodInvocation ?methodinvoc)
+    (jdt/has :name ?methodinvoc ?methodcallname)
+    (jdt/name|simple-name|simple|same ?methodcallname ?methodname)
+    ;;we should add something that verifies that the 'removed code' from the update is similar
+    ))

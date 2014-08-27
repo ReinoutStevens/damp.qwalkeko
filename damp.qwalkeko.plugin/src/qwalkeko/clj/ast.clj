@@ -112,3 +112,28 @@
       (compilationunit-typedeclaration|main ?compunit ?rightmain)
       (jdt/has :name ?rightmain ?rightname)
       (jdt/name-name|same|qualified ?leftname ?rightname))))
+
+
+;;similarity
+(defn levenshtein [left right]
+  (org.apache.commons.lang3.StringUtils/getLevenshteinDistance
+    (.toString left)
+    (.toString right)))
+
+(defn levenshtein-normalized [left right]
+  (let [lstring (.toString left)
+        rstring (.toString right)
+        maxlength (max (count lstring) (count rstring))]
+    (/ (org.apache.commons.lang3.StringUtils/getLevenshteinDistance
+         lstring rstring)
+      maxlength)))
+
+
+(defn ast-ast|levenshtein [?left ?right ?levenshtein]
+  (logic/project [?left ?right]
+    (logic/== ?levenshtein (levenshtein ?left ?right))))
+
+
+(defn ast-ast|levenshtein-normalized [?left ?right ?levenshtein]
+  (logic/project [?left ?right]
+    (logic/== ?levenshtein (levenshtein-normalized ?left ?right))))

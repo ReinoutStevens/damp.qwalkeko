@@ -109,9 +109,15 @@
     (change/change-original change ?method)
     (change/update-property change :body)))
 
+(defn ast-ast|similar [?left ?right]
+  (logic/fresh [?levenshtein]
+    (ast/ast-ast|levenshtein-normalized ?left ?right ?levenshtein)
+    (logic/project [?levenshtein]
+      (logic/== true (> 0.6 ?levenshtein))))) ;;this value is chosen atm chosen at random
 
 (defn changes-extract-method-deleting-inserting [changes ?extracted ?deleting ?inserting ]
-  (logic/fresh [?methodname ?methodinvoc ?methodcallname ?insert-change ?insert-into]
+  (logic/fresh 
+    [?methodname ?methodinvoc ?methodcallname ?insert-change ?insert-into ?deleted-node ?extracted-body]
     (damp.ekeko.logic/contains changes ?insert-change)
     (change-method-inserted ?insert-change ?extracted)
     (jdt/has :name ?extracted ?methodname)
@@ -126,12 +132,15 @@
     (damp.ekeko.logic/contains changes ?deleting)
     (change/change|delete ?deleting)
     (change/change-affects-original-node ?deleting ?insert-into)
-    ;;we should add something that verifies that the inserted code and deleting code is similar
-    ))
+    ;;verify similarity
+    (jdt/has :body ?extracted ?extracted-body)
+    (change/change-original ?deleting ?deleted-node)
+    (ast-ast|similar  ?deleted-node ?extracted-body)))
 
 
 (defn changes-extract-method-updating [changes ?extracted ?updating]
-  (logic/fresh [?methodname ?methodinvoc ?methodcallname ?updated-method ?insert-change]
+  (logic/fresh
+    [?methodname ?methodinvoc ?methodcallname ?updated-method ?insert-change ?updated-node ?extracted-body]
     (damp.ekeko.logic/contains changes ?insert-change)
     (change-method-inserted ?insert-change ?extracted)
     (jdt/has :name ?extracted ?methodname)
@@ -143,5 +152,6 @@
     (jdt/ast :MethodInvocation ?methodinvoc)
     (jdt/has :name ?methodinvoc ?methodcallname)
     (jdt/name|simple-name|simple|same ?methodcallname ?methodname)
-    ;;we should add something that verifies that the 'removed code' from the update is similar
-    ))
+    (jdt/has :body ?extracted ?extracted-body)
+    (change/change-original ?updating ?updated-node)
+    (ast-ast|similar ?updated-node ?extracted-body)))

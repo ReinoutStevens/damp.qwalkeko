@@ -98,14 +98,15 @@
 
 
 ;;Reification
+(defn changes [changes lroot rroot]
+  (logic/all
+    (logic/project [lroot rroot]
+      (logic/== changes (get-ast-changes lroot rroot)))))
 
-(defn change [?change ?lroot ?rroot]
+(defn change [?change lroot rroot]
   (logic/fresh [?changes]
-             (jdt/ast :CompilationUnit ?lroot)
-             (jdt/ast :CompilationUnit ?rroot)
-             (logic/project [?lroot ?rroot]
-                            (logic/== ?changes (get-ast-changes ?lroot ?rroot)))
-             (logic/membero ?change ?changes)))
+    (changes ?changes lroot rroot)
+    (logic/membero ?change ?changes)))
 
 
 (defn change-type [?change ?type]
@@ -113,7 +114,7 @@
     (logic/featurec ?change {:operation ?type})))
 
 
-;;non logical predicates (not the word I am looking for)
+;;non relational predicates
 (defn change|move [change]
   (logic/all
     (change-type change :move)))
@@ -130,58 +131,102 @@
   (logic/all
     (change-type change :delete)))
 
-(defn change|original [change ?original]
+(defn change-original [change ?original]
   (logic/project [change]
     (logic/featurec change {:original ?original})))     
 
-(defn update|newvalue [update ?value]
+(defn update-rightparent [update ?value]
   (logic/all
     (change|update update)
     (logic/project [update]
       (logic/featurec update {:right-parent ?value}))))
 
-(defn insert|newnode [insert ?node]
+(defn update-into 
+  [update ?node]
+  (logic/fresh [?newnode]
+    (update-rightparent update ?newnode)
+    (logic/conde
+      [(logic/== ?node ?newnode)]
+      [(jdt/ast-parent+ ?newnode ?node)])))
+
+(defn update-property [update ?property]
   (logic/all
-    (change|insert change)
+    (change|update update)
+    (logic/project [update]
+      (logic/featurec update {:property ?property}))))
+
+(defn insert-newnode [insert ?node]
+  (logic/all
+    (change|insert insert)
     (logic/project [insert]
       (logic/featurec insert {:right-node ?node}))))
 
-(defn move|newparent [move ?node]
+(defn move-newparent [move ?node]
   (logic/all
     (change|move move)
     (logic/project [move]
       (logic/featurec move {:new-parent ?node}))))
 
-(defn insert|insert-into-node
+(defn insert-into
   [insert ?node]
   (logic/fresh [?newnode]
-    (insert|newnode insert ?newnode)
+    (insert-newnode insert ?newnode)
     (logic/conde
       [(logic/== ?node ?newnode)]
       [(jdt/ast-parent+ ?newnode ?node)])))
 
-(defn move|moved-into-node
+(defn move-into
   [move ?node]
   (logic/fresh [?newnode]
-    (move|newparent move ?newnode)
+    (move-newparent move ?newnode)
     (logic/conde
       [(logic/== ?node ?newnode)]
       [(jdt/ast-parent+ ?newnode ?node)])))
 
-(defn change|affects-original-node
+(defn change-affects-original-node
   [change ?node]
   (logic/fresh [?original]
-    (change|original change ?original)
+    (change-original change ?original)
     (logic/conde
       [(logic/== ?original ?node)]
       [(jdt/ast-parent+ ?original ?node)])))
 
 
-(defn change|affects-node [change ?node]
+(defn change-affects-new-node
+  [change ?node]
+  (logic/conda
+    [(change|insert change)
+     (insert-into change ?node)]
+    [(change|move change)
+     (move-into change ?node)]
+    [(change|update change)
+     (update-into change ?node)]))
+
+(defn change-affects-node [change ?node]
   (logic/conde
-    [(change|affects-original-node change ?node)]
-    [(move|moved-into-node change ?node)]
-    [(insert|insert-into-node change ?node)]))
+    [(change-affects-original-node change ?node)]
+    [(move-into change ?node)]
+    [(insert-into change ?node)]))
+
+(defn change-contains-original-node [change ?node]
+  (logic/fresh [?original]
+    (change-original change ?original)
+    (logic/conde
+      [(logic/== ?node ?original)]
+      [(jdt/child+ ?original ?node)])))
+
+(defn change-contains-new-node [change ?node]
+  (logic/fresh [?n]
+    (logic/conda
+      [(change|insert change)
+       (insert-into change ?n)]
+      [(change|update change)
+       (update-rightparent change ?n)]
+      [(change|move change)
+       (move-into change ?n)])
+    (logic/conde
+      [(logic/== ?node ?n)]
+      [(jdt/child+ ?n ?node)])))
 
 ;;Combining changes
 

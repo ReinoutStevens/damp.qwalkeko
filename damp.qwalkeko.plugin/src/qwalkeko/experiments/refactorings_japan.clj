@@ -11,15 +11,119 @@
   (:require [damp.qwal :as qwal]))
 
 
-
+;;https://www.dropbox.com/home/CloneRefactoring
 
 
 (def a-model (first (damp.ekeko.ekekomodel/all-project-models)))
 (def a-graph (graph/convert-model-to-graph a-model))
 (def a-root (first (:roots a-graph)))
 
-(def refactored-version
+(comment
+  (filter #(let [infos (graph/file-infos %)]
+                (> (count (filter (fn [f]
+                                    (re-find #"DirectoryScanner" (:file f)))
+                            infos))
+                  0))
+       (:versions a-graph))
+
+  (filter
+       #(let [r (l/qwalkeko* [?v]
+                  (qwal/qwal a-graph % ?v [?type ?method ?name ?mname]
+                    (l/in-source-code [c]
+                      (jdt/ast :TypeDeclaration ?type)
+                      (jdt/has :name ?type ?name)
+                      (jdt/name|simple-string ?name "DirectoryScanner")
+                      (jdt/ast :MethodDeclaration ?method)
+                      (jdt/has :name ?method ?mname)
+                      (jdt/name|simple-string ?mname "normalizePattern")
+                      (jdt/ast-typedeclaration|encompassing ?method ?type))))]
+          (graph/ensure-delete %)
+          (> (count r) 0))
+       les-versions))
+
+(def refactored-version ;;partially extracted method body
   (first
-    (filter #(= "refactoring DirectoryScanner to reduce duplicated code, tests all pass  git-svn-id: https://svn.apache.org/repos/asf/ant/core/trunk@436724 13f79535-47bb-0310-9956-ffa450edef68"
-               (graph/commit-message %))
+    (filter #(= "21a1b3cfb48abc9e87a97e1bdab451abe49b44eb"
+               (graph/revision-number %))
          (:versions a-graph))))
+
+(def refactored-version ;;extracted method from paper
+  (first
+    (filter #(= "28d39b09a766fbb0dd3ca9b65ac06edf89075e8e" 
+               (graph/revision-number %)) 
+      (:versions a-graph))))
+
+(def original-version
+  (first (graph/predecessors refactored-version)))
+
+(def asts
+  (l/qwalkeko 1 [?left ?right]
+    (qwal/qwal a-graph refactored-version original-version 
+      [?typedecl ?tname ?package ?pname]
+      (l/in-source-code [c]
+        (jdt/ast :CompilationUnit ?right)
+        (jdt/has :package ?right ?package)
+        (jdt/has :name ?package ?pname)
+        (jdt/name|qualified-string ?pname "org.apache.tools.ant")
+        (ast/compilationunit-typedeclaration|main ?right ?typedecl)
+        (jdt/has :name ?typedecl ?tname)
+        (jdt/name|simple-string ?tname "DirectoryScanner"))
+      qwal/q<=
+      (l/in-source-code [c]
+        (ast/compilationunit|corresponding ?right ?left)))))
+
+(def left-ast (first (first asts)))
+(def right-ast (second (first asts)))
+
+(def changes (change/get-ast-changes left-ast right-ast))
+
+(defn change-affects-method-declaration [change ?method]
+  (logic/all
+    (change/change-affects-node change ?method)
+    (jdt/ast :MethodDeclaration ?method)))
+
+;;non-relational
+(defn changes-affect-same-node [changes ?new-changes node]
+  (logic/conda
+    [(logic/emptyo changes)
+     (logic/== ?new-changes '())]
+    [(logic/fresh [?head ?tail ?result]
+       (logic/conso ?head ?tail changes)
+       (logic/conda
+         [(change/change-affects-node ?head node)
+          (logic/conso ?head ?result ?new-changes)
+          (changes-affect-same-node ?tail ?result node)]
+         [(changes-affect-same-node ?tail ?new-changes node)]))]))
+
+
+(defn change-method-inserted [change ?method]
+  (logic/all
+    (change/change|insert change)
+    (change/insert-newnode change ?method)
+    (jdt/ast :MethodDeclaration ?method)))
+
+
+(defn change|body-updated [change]
+  (logic/fresh [?method]
+    (change/change|update change)
+    (change/change-original change ?method)
+    (change/update-property change :body)))
+
+
+(defn changes-extract-method-from [changes ?method ?from ?insert-change ?from-change]
+  (logic/fresh [?methodname ?methodcall ?methodcallname]
+    (logic/membero ?insert-change changes)
+    (change-method-inserted ?insert-change ?method)
+    (jdt/has :name ?method ?methodname)
+    (logic/membero ?from-change changes)
+    (change/change|insert ?from-change)
+    (change/change-affects-new-node ?from-change ?from)
+    (jdt/ast :MethodDeclaration ?from)
+    (change/change-contains-new-node ?from-change ?methodcall)
+    (jdt/ast :MethodInvocation ?methodcall)
+    (jdt/has :name ?methodcall ?methodcallname)
+    (jdt/name|simple-name|simple|same ?methodcallname ?methodname)))
+
+
+
+    

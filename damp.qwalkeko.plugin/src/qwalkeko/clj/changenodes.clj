@@ -19,12 +19,13 @@
 (defn make-delete [astnode]
   {:operation :delete :original astnode})
 
-(defn make-move [astnode new-parent property index]
+(defn make-move [astnode new-parent right-node property index]
   {:operation :move 
    :original astnode 
    :property property 
    :index index 
-   :new-parent new-parent})
+   :new-parent new-parent
+   :right-node right-node})
 
 (defn make-update [left-parent right-parent property]
   {:operation :update 
@@ -64,6 +65,7 @@
 (defmethod convert-operation Move [operation]
   (make-move (.getOriginal operation)
              (.getNewParent operation)
+             (.getRightNode operation)
              (convert-property (.getProperty operation))
              (convert-index (.getIndex operation))))
 
@@ -167,6 +169,13 @@
     (logic/project [move]
       (logic/featurec move {:new-parent ?node}))))
 
+(defn move-rightnode [move ?node]
+  (logic/all
+    (change|move move)
+    (logic/project [move]
+      (logic/featurec move {:right-node ?node}))))
+
+
 (defn insert-into
   [insert ?node]
   (logic/fresh [?newnode]
@@ -178,7 +187,7 @@
 (defn move-into
   [move ?node]
   (logic/fresh [?newnode]
-    (move-newparent move ?newnode)
+    (move-rightnode move ?newnode)
     (logic/conde
       [(logic/== ?node ?newnode)]
       [(jdt/ast-parent+ ?newnode ?node)])))
@@ -219,14 +228,16 @@
   (logic/fresh [?n]
     (logic/conda
       [(change|insert change)
-       (insert-into change ?n)]
+       (insert-newnode change ?n)]
       [(change|update change)
        (update-rightparent change ?n)]
       [(change|move change)
-       (move-into change ?n)])
+       (move-newparent change ?n)])
     (logic/conde
       [(logic/== ?node ?n)]
       [(jdt/child+ ?n ?node)])))
+
+
 
 ;;Combining changes
 

@@ -115,7 +115,7 @@
     (logic/project [?levenshtein]
       (logic/== true (> 0.6 ?levenshtein))))) ;;this value is chosen atm chosen at random
 
-(defn changes-extract-method-deleting-inserting [changes ?extracted ?deleting ?inserting ]
+(defn changes-extract-method-deleting-inserting [changes ?extracted ?deleting ?inserting]
   (logic/fresh 
     [?methodname ?methodinvoc ?methodcallname ?insert-change ?insert-into ?deleted-node ?extracted-body]
     (damp.ekeko.logic/contains changes ?insert-change)
@@ -155,3 +155,35 @@
     (jdt/has :body ?extracted ?extracted-body)
     (change/change-original ?updating ?updated-node)
     (ast-ast|similar ?updated-node ?extracted-body)))
+
+
+(defn changes-extract-method-moving-inserting [changes ?extracted ?moving ?inserting]
+  (logic/fresh 
+    [?methodname ?methodinvoc ?methodcallname ?insert-change ?insert-into ?extracted-body ?move-right]
+    (damp.ekeko.logic/contains changes ?insert-change)
+    (change-method-inserted ?insert-change ?extracted)
+    (jdt/has :name ?extracted ?methodname)
+    (damp.ekeko.logic/contains changes ?inserting)
+    (change/change|insert ?inserting)
+    (change/change-affects-original-node ?inserting ?insert-into)
+    (jdt/ast :MethodDeclaration ?insert-into)
+    (change/change-contains-new-node ?inserting ?methodinvoc)
+    (jdt/ast :MethodInvocation ?methodinvoc)
+    (jdt/has :name ?methodinvoc ?methodcallname)
+    (jdt/name|simple-name|simple|same ?methodcallname ?methodname)
+    (damp.ekeko.logic/contains changes ?moving)
+    (change/change|move ?moving)
+    (change/change-affects-original-node ?moving ?insert-into)
+    (jdt/has :body ?extracted ?extracted-body)
+    (change/move-rightnode ?moving ?move-right)
+    (jdt/ast-parent ?move-right ?extracted-body)))
+    
+;;detecting extracted methods from clones
+
+(defn changes-extract-method-from-clones [changes ?extracted ?deletingA ?insertingA ?deletingB ?insertingB]
+  (logic/all
+    (changes-extract-method-deleting-inserting changes ?extracted ?deletingA ?insertingA)
+    (changes-extract-method-deleting-inserting changes ?extracted ?deletingB ?insertingB)
+    (logic/!= ?deletingA ?deletingB)
+    (logic/!= ?insertingA ?insertingB)))
+    

@@ -5,7 +5,7 @@
    (:require [qwalkeko.clj.reification :as r])
    (:require [qwalkeko.clj.graph :as graph])
    (:require [qwalkeko.clj.ast :as ast])
-   (:require [qwalkeko.clj.changenodes :as change])
+   (:require [qwalkeko.clj.changes :as change])
    (:require [damp.ekeko.jdt
               [ast :as jdt]
               [convenience :as conv]])

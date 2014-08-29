@@ -4,7 +4,7 @@
   (:require [qwalkeko.clj.reification :as r])
   (:require [qwalkeko.clj.graph :as graph])
   (:require [qwalkeko.clj.ast :as ast])
-  (:require [qwalkeko.clj.changenodes :as change])
+  (:require [qwalkeko.clj.changes :as change])
   (:require [damp.ekeko.jdt
              [ast :as jdt]
              [convenience :as conv]])
@@ -75,7 +75,8 @@
 (def left-ast (first (first asts)))
 (def right-ast (second (first asts)))
 
-(def changes (change/get-ast-changes left-ast right-ast))
+(def changes (qwalkeko.clj.changenodes/get-ast-changes left-ast right-ast))
+(def normalized-changes (qwalkeko.clj.changenodes/normalize-changes changes))
 
 (defn change-affects-method-declaration [change ?method]
   (logic/all
@@ -177,13 +178,14 @@
     (jdt/has :body ?extracted ?extracted-body)
     (change/move-rightnode ?moving ?move-right)
     (jdt/ast-parent ?move-right ?extracted-body)))
+
+
     
 ;;detecting extracted methods from clones
 
-(defn changes-extract-method-from-clones [changes ?extracted ?deletingA ?insertingA ?deletingB ?insertingB]
+(defn changes-extract-method-from-clones [changes ?extracted ?deletingA ?insertingA ?movingB ?insertingB]
   (logic/all
     (changes-extract-method-deleting-inserting changes ?extracted ?deletingA ?insertingA)
-    (changes-extract-method-deleting-inserting changes ?extracted ?deletingB ?insertingB)
-    (logic/!= ?deletingA ?deletingB)
+    (changes-extract-method-moving-inserting changes ?extracted ?movingB ?insertingB)
     (logic/!= ?insertingA ?insertingB)))
     

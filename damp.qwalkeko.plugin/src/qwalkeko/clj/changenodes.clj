@@ -98,173 +98,47 @@
     (.apply updated-change)))
 
 
+;;
+(defn update-get-value [update]
+  (let [{:keys [right-parent property]} update]
+    ((property (damp.ekeko.jdt.astnode/reifiers right-parent)) right-parent)))
+    
 
-;;Reification
-(defn changes [changes lroot rroot]
-  (logic/all
-    (logic/project [lroot rroot]
-      (logic/== changes (get-ast-changes lroot rroot)))))
-
-(defn change [?change lroot rroot]
-  (logic/fresh [?changes]
-    (changes ?changes lroot rroot)
-    (logic/membero ?change ?changes)))
-
-
-(defn change-type [?change ?type]
-  (logic/project [?change]
-    (logic/featurec ?change {:operation ?type})))
-
-
-;;non relational predicates
-(defn change|move [change]
-  (logic/all
-    (change-type change :move)))
-
-(defn change|update [change]
-  (logic/all
-    (change-type change :update)))
-
-(defn change|insert [change]
-  (logic/all
-    (change-type change :insert)))
-
-(defn change|delete [change]
-  (logic/all
-    (change-type change :delete)))
-
-(defn change-original [change ?original]
-  (logic/project [change]
-    (logic/featurec change {:original ?original})))     
-
-(defn update-rightparent [update ?value]
-  (logic/all
-    (change|update update)
-    (logic/project [update]
-      (logic/featurec update {:right-parent ?value}))))
-
-(defn update-into 
-  [update ?node]
-  (logic/fresh [?newnode]
-    (update-rightparent update ?newnode)
-    (logic/conde
-      [(logic/== ?node ?newnode)]
-      [(jdt/ast-parent+ ?newnode ?node)])))
-
-(defn update-property [update ?property]
-  (logic/all
-    (change|update update)
-    (logic/project [update]
-      (logic/featurec update {:property ?property}))))
-
-(defn insert-newnode [insert ?node]
-  (logic/all
-    (change|insert insert)
-    (logic/project [insert]
-      (logic/featurec insert {:right-node ?node}))))
-
-(defn move-newparent [move ?node]
-  (logic/all
-    (change|move move)
-    (logic/project [move]
-      (logic/featurec move {:new-parent ?node}))))
-
-(defn move-rightnode [move ?node]
-  (logic/all
-    (change|move move)
-    (logic/project [move]
-      (logic/featurec move {:right-node ?node}))))
+;;note that these are not 100% correct: an insert is never used to update smthg
+;;still we allow the conversion to make reasoning over changes easier
+(defn move->delete-insert [move]
+  (let [moved-node (:original move)
+        idx (:index move)
+        property (:property move)
+        new-parent (:new-parent move)
+        towards (:right-node move)
+        delete (make-delete moved-node)
+        insert (make-insert new-parent (.getParent towards) towards property idx)]
+    [delete insert]))
 
 
-(defn insert-into
-  [insert ?node]
-  (logic/fresh [?newnode]
-    (insert-newnode insert ?newnode)
-    (logic/conde
-      [(logic/== ?node ?newnode)]
-      [(jdt/ast-parent+ ?newnode ?node)])))
+(defn update->delete-insert [update]
+  (let [updated-node (:original update)
+        property (:property update)
+        right-parent (:right-parent update)
+        new-value (update-get-value update)
+        delete (make-delete updated-node)
+        insert (make-insert (.getParent updated-node) right-parent new-value property nil)]
+    [delete insert]))
 
-(defn move-into
-  [move ?node]
-  (logic/fresh [?newnode]
-    (move-rightnode move ?newnode)
-    (logic/conde
-      [(logic/== ?node ?newnode)]
-      [(jdt/ast-parent+ ?newnode ?node)])))
+(defmulti normalize-change :operation)
 
-(defn change-affects-original-node
-  [change ?node]
-  (logic/fresh [?original]
-    (change-original change ?original)
-    (logic/conde
-      [(logic/== ?original ?node)]
-      [(jdt/ast-parent+ ?original ?node)])))
+(defmethod normalize-change :delete [delete]
+  [delete])
 
+(defmethod normalize-change :insert [insert]
+  [insert])
 
-(defn change-affects-new-node
-  [change ?node]
-  (logic/conda
-    [(change|insert change)
-     (insert-into change ?node)]
-    [(change|move change)
-     (move-into change ?node)]
-    [(change|update change)
-     (update-into change ?node)]))
+(defmethod normalize-change :move [move]
+  (move->delete-insert move))
 
-(defn change-affects-node [change ?node]
-  (logic/conde
-    [(change-affects-original-node change ?node)]
-    [(move-into change ?node)]
-    [(insert-into change ?node)]))
+(defmethod normalize-change :update [update]
+  (update->delete-insert update))
 
-(defn change-contains-original-node [change ?node]
-  (logic/fresh [?original]
-    (change-original change ?original)
-    (logic/conde
-      [(logic/== ?node ?original)]
-      [(jdt/child+ ?original ?node)])))
-
-(defn change-contains-new-node [change ?node]
-  (logic/fresh [?n]
-    (logic/conda
-      [(change|insert change)
-       (insert-newnode change ?n)]
-      [(change|update change)
-       (update-rightparent change ?n)]
-      [(change|move change)
-       (move-newparent change ?n)])
-    (logic/conde
-      [(logic/== ?node ?n)]
-      [(jdt/child+ ?n ?node)])))
-
-
-
-;;Combining changes
-
-
-;;Idea
-;;Anti-unify changes by looping through the properties and seeing which ones differ/remain the same
-;;Select the ones that would not affect any other nodes in the current program
-
-;;Moeten context nakijken om te zien hoe de change relateert
-;;Hierbij moeten we zowel naar boven als naar beneden wandelen
-
-;;Zolang we naar boven kunnen gaan en dezelfde type node tegenkomen kunnen we nodes blijven behouden
-;;Vanaf we != type tegenkomen kunnen we vervangen door logische var
-;;Goed mogelijk dat we die node moeten vervangen door een logische var en verder naar boven blijven gaan
-;;Maar pakt da da initieel nie nodig is
-
-;;Hetzelfde in het afdalen van de node
-
-;;Matcher gebruiken hiervoor en matchende nodes laten staan, de rest vervangen door logische vars?
-;;Ik moet minder lijm snuiven
-
-
-;;Voordelen van deze aanpak: context van changes wordt afgeleid van de AST waar hij plaats vindt.
-;;Bijv: ge verandert een method van naam en past dan ook al de callers van die method aan.
-;;De naamaanpassing zelf wordt niet veralgemeend, maar al de callers vd method wordt bijv wel aangepast
-;;Het is gewoon te hopen dat context van 1 file voldoende is, en we niet verder moeten kijken
-;;Zou wss toch niet schalen
-
-
-
+(defn normalize-changes [changes]
+  (mapcat normalize-change changes))

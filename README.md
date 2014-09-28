@@ -69,7 +69,7 @@ We also ensure that both authors are different. Finally we transition to the nex
 
 ### More examples
 Examples can be found in the experiments and demo folder.
-The two files you want to take a look at are [selenium.clj](https://github.com/ReinoutStevens/damp.qwalkeko/blob/master/src/qwalkeko/experiments/selenium.clj) and [icsme-selenium.clj](https://github.com/ReinoutStevens/damp.qwalkeko/blob/master/src/qwalkeko/demo/icsme_selenium.clj).
+The two files you want to take a look at are [selenium.clj](https://github.com/ReinoutStevens/damp.qwalkeko/blob/master/damp.qwalkeko.plugin/src/qwalkeko/experiments/selenium.clj) and [icsme-selenium.clj](https://github.com/ReinoutStevens/damp.qwalkeko/blob/master/damp.qwalkeko.plugin/src/qwalkeko/demo/icsme_selenium.clj).
 
 
 

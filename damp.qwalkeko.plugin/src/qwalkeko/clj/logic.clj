@@ -7,6 +7,7 @@
   (:require [qwalkeko.clj.sessions :as sessions]) 
   (:require [damp.ekeko.workspace.reification :as workspace])
   (:require [damp.ekeko.jdt.ast :as jdt])
+  (:require [damp.ekeko :as ekeko])
   (:import [qwalkeko HistoryProjectModel])
   (:require [damp.qwal :as qwal])
   (:require [clojure.java.io :as io]))
@@ -108,11 +109,34 @@
        (logic/run* [~@vars] ~@goals))))
 
 
+(defmacro qwalkeko-ui* [ [ & vars ] & goals]
+  `(binding [damp.ekeko.ekekomodel/*queried-project-models*  (atom '())]
+     (ekeko/ekeko* [~@vars]
+       ~@goals)))
+
 (defmacro qwalkeko [results [ & vars] & goals]
     `(binding [damp.ekeko.ekekomodel/*queried-project-models*  (atom '())]
        (doall
          (logic/run ~results [~@vars] ~@goals))))
 
+(defmacro qwalkeko-ui [results [& vars] & goals]
+  `(binding [damp.ekeko.ekekomodel/*queried-project-models*  (atom '())]
+     (ekeko/ekeko-n* ~results 
+       [~@vars]
+       ~@goals)))
+
+(defmacro qwalkeko-ui [n [& vars] & goals]
+  `(let [querystr# (damp.ekeko.util.text/pprint-query-str '(qwalkeko-ui [~@vars] ~@goals))
+         start# (System/nanoTime)
+         resultsqc# (binding [damp.ekeko.ekekomodel/*queried-project-models*  (atom '())]
+                      (doall (logic/run ~n [resultvar#] 
+                               (logic/fresh [~@vars]
+                                      (logic/== resultvar# [~@vars])
+                                      ~@goals))))
+         elapsed#  (/ (double (- (System/nanoTime) start#)) 1000000.0)
+         cnt# (count resultsqc#)]
+     (damp.ekeko.gui/eclipse-uithread-return
+       (fn [] (damp.ekeko.gui/open-barista-results-viewer* querystr# '(~@vars) resultsqc# elapsed# cnt#)))))
 
 (defmacro in-current-meta [[meta] & goals]
   `(qwal/qcurrent [~meta] ~@goals))

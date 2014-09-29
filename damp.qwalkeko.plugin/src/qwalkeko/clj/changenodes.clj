@@ -100,8 +100,11 @@
 
 ;;
 (defn update-get-value [update]
-  (let [{:keys [right-parent property]} update]
-    ((property (damp.ekeko.jdt.astnode/reifiers right-parent)) right-parent)))
+  (let [{:keys [right-parent property]} update
+        value ((property (damp.ekeko.jdt.astnode/reifiers right-parent)) right-parent)]
+    (if (map? value)
+      (:value value)
+      value)))
     
 
 ;;note that these are not 100% correct: an insert is never used to update smthg

@@ -114,6 +114,20 @@
       (jdt/name-name|same|qualified ?leftname ?rightname))))
 
 
+(defn methoddeclaration|corresponding [left ?right]
+  "finds the corresponding methoddeclartion of left in the current version"
+  ;;probably better to compute changes to detect renames as well
+  (logic/fresh [?left-comp ?right-comp ?leftName ?rightName]
+    (logic/project [left]
+      (jdt/ast-root left ?left-comp)
+      (compilationunit|corresponding ?left-comp ?right-comp)
+      (jdt/child+ ?right-comp ?right)
+      (jdt/ast :MethodDeclaration ?right)
+      (jdt/has :name ?right ?rightName)
+      (jdt/has :name left ?leftName)
+      (jdt/name|simple-name|simple|same ?leftName ?rightName))))
+
+
 ;;similarity
 (defn levenshtein [left right]
   (org.apache.commons.lang3.StringUtils/getLevenshteinDistance
@@ -137,3 +151,23 @@
 (defn ast-ast|levenshtein-normalized [?left ?right ?levenshtein]
   (logic/project [?left ?right]
     (logic/== ?levenshtein (levenshtein-normalized ?left ?right))))
+
+(defn usim [left right]
+  (defn clean-string [str]
+    (clojure.string/replace str #"\s{2,}" " ")) ;;incorrect for code that contains strings that contain spaces/newlines, oh well 
+  (let [lstring (.toString left)
+        rstring (.toString right)
+        lclean (clean-string lstring)
+        rclean (clean-string rstring)
+        mlen (max (count lclean) (count rclean))]
+    (/ (- mlen (levenshtein lclean rclean)) mlen)))
+
+
+(defn usim-similar? [left right]
+  (>= (usim left right) 0.65)) ;;0.65 taken from http://sel.ist.osaka-u.ac.jp/~lab-db/betuzuri/archive/921/921.pdf
+    
+    
+(defn ast-ast|usim-similar [left right]
+  (logic/project [left right]
+    (logic/== true (usim-similar? left right))))
+

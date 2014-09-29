@@ -8,6 +8,7 @@
   (:require [damp.ekeko.jdt
              [ast :as jdt]
              [convenience :as conv]])
+  (:require [damp.ekeko.logic :as el])
   (:require [damp.qwal :as qwal]))
 
 
@@ -111,18 +112,16 @@
     (change/update-property change :body)))
 
 (defn ast-ast|similar [?left ?right]
-  (logic/fresh [?levenshtein]
-    (ast/ast-ast|levenshtein-normalized ?left ?right ?levenshtein)
-    (logic/project [?levenshtein]
-      (logic/== true (> 0.6 ?levenshtein))))) ;;this value is chosen atm chosen at random
+  (logic/all
+    (ast/ast-ast|usim-similar ?left ?right)))
 
 (defn changes-extract-method-deleting-inserting [changes ?extracted ?deleting ?inserting]
   (logic/fresh 
     [?methodname ?methodinvoc ?methodcallname ?insert-change ?insert-into ?deleted-node ?extracted-body]
-    (damp.ekeko.logic/contains changes ?insert-change)
+    (e/contains changes ?insert-change)
     (change-method-inserted ?insert-change ?extracted)
     (jdt/has :name ?extracted ?methodname)
-    (damp.ekeko.logic/contains changes ?inserting)
+    (el/contains changes ?inserting)
     (change/change|insert ?inserting)
     (change/change-affects-original-node ?inserting ?insert-into)
     (jdt/ast :MethodDeclaration ?insert-into)
@@ -130,7 +129,7 @@
     (jdt/ast :MethodInvocation ?methodinvoc)
     (jdt/has :name ?methodinvoc ?methodcallname)
     (jdt/name|simple-name|simple|same ?methodcallname ?methodname)
-    (damp.ekeko.logic/contains changes ?deleting)
+    (el/contains changes ?deleting)
     (change/change|delete ?deleting)
     (change/change-affects-original-node ?deleting ?insert-into)
     ;;verify similarity
@@ -142,10 +141,10 @@
 (defn changes-extract-method-updating [changes ?extracted ?updating]
   (logic/fresh
     [?methodname ?methodinvoc ?methodcallname ?updated-method ?insert-change ?updated-node ?extracted-body]
-    (damp.ekeko.logic/contains changes ?insert-change)
+    (el/contains changes ?insert-change)
     (change-method-inserted ?insert-change ?extracted)
     (jdt/has :name ?extracted ?methodname)
-    (damp.ekeko.logic/contains changes ?updating)
+    (el/contains changes ?updating)
     (change/change|update ?updating)
     (change/change-affects-original-node ?updating ?updated-method)
     (jdt/ast :MethodDeclaration ?updated-method)
@@ -161,10 +160,10 @@
 (defn changes-extract-method-moving-inserting [changes ?extracted ?moving ?inserting]
   (logic/fresh 
     [?methodname ?methodinvoc ?methodcallname ?insert-change ?insert-into ?extracted-body ?move-right]
-    (damp.ekeko.logic/contains changes ?insert-change)
+    (el/contains changes ?insert-change)
     (change-method-inserted ?insert-change ?extracted)
     (jdt/has :name ?extracted ?methodname)
-    (damp.ekeko.logic/contains changes ?inserting)
+    (el/contains changes ?inserting)
     (change/change|insert ?inserting)
     (change/change-affects-original-node ?inserting ?insert-into)
     (jdt/ast :MethodDeclaration ?insert-into)
@@ -172,7 +171,7 @@
     (jdt/ast :MethodInvocation ?methodinvoc)
     (jdt/has :name ?methodinvoc ?methodcallname)
     (jdt/name|simple-name|simple|same ?methodcallname ?methodname)
-    (damp.ekeko.logic/contains changes ?moving)
+    (el/contains changes ?moving)
     (change/change|move ?moving)
     (change/change-affects-original-node ?moving ?insert-into)
     (jdt/has :body ?extracted ?extracted-body)
@@ -180,6 +179,22 @@
     (jdt/ast-parent ?move-right ?extracted-body)))
 
 
+(defn meh [changes ?renamed ?inserted]
+  (logic/fresh
+    []
+    (change/change-ast|inserted changes ?insertchange  ?inserted)
+    (jdt/ast :MethodDeclaration ?inserted)
+    (change/ast|renamed changes ?renamechange ?renamed)
+    (
+    
+    (el/contains changes ?insert-name-change)
+    (change/change|insert ?insert-name-change)
+    (change/insert-newnode ?insert-name-change ?insert-name)
+    (jdt/ast :SimpleName ?insert-name)
+    (jdt/ast-parent ?insert-name ?method)
+    (jdt/ast :MethodDeclaration ?method)
+    (jdt/has :name ?method ?insert-name)
+    (el/contains changes ?insert-change)
     
 ;;detecting extracted methods from clones
 
@@ -188,4 +203,36 @@
     (changes-extract-method-deleting-inserting changes ?extracted ?deletingA ?insertingA)
     (changes-extract-method-moving-inserting changes ?extracted ?movingB ?insertingB)
     (logic/!= ?insertingA ?insertingB)))
-    
+
+
+(defn changes-extract-method-from-clones [changes ?extracted ?deletingA ?insertingA ?deletingB ?insertingB]
+  (logic/all
+    (changes-extract-method-deleting-inserting changes ?extracted ?deletingA ?insertingA)
+    (changes-extract-method-deleting-inserting changes ?extracted ?deletingB ?insertingB)
+    (logic/!= ?deletingA ?deletingB)
+    (logic/!= ?insertingA ?insertingB)))
+
+
+;;comparing differences between both clones that were refactored
+(defn distill-changes-from-clones [graph changes start]
+  (l/qwalkeko* [?changesA ?changesB]
+    (logic/fresh [?extracted ?deletingA ?insertingA ?deletingB ?insertingB ?leftroot ?rightroot 
+                  ?end ?methodA ?methodB ?rightMethodA ?rightMethodB]
+      (changes-extract-method-from-clones changes ?extracted ?deletingA ?insertingA ?deletingB ?insertingB)
+      (qwal/qwal graph start ?end []
+        (l/in-source-code [curr]
+          (jdt/ast-root ?deletingA ?leftroot)
+          (jdt/ast-parent+ ?deletingA ?methodA)
+          (jdt/ast :MethodDeclaration ?methodA)
+          (jdt/ast-parent+ ?deletingB ?methodB)
+          (jdt/ast :MethodDeclaration ?methodB)
+          (logic/!= ?methodB ?methodA))
+        qwal/q=>
+        (l/in-source-code [curr]
+          (ast/compilationunit|corresponding ?leftroot ?rightroot)
+          (ast/methoddeclaration|corresponding ?methodA ?rightMethodA)
+          (ast/methoddeclaration|corresponding ?methodB ?rightMethodB)
+          (change/changes ?changesA ?methodA ?rightMethodA)
+          (change/changes ?changesB ?methodB ?rightMethodB))))))
+  
+      

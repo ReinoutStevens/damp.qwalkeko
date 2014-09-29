@@ -1,6 +1,7 @@
 (ns qwalkeko.clj.changes
   (:require [clojure.core.logic :as logic])
   (:require [qwalkeko.clj.changenodes :as nodes])
+  (:require [damp.ekeko.logic :as el])
   (:require [damp.ekeko.jdt
            [ast :as jdt]]))
 
@@ -142,8 +143,17 @@
       [(jdt/child+ ?n ?node)])))
 
 
-;;generalize changes
+(defn change-ast|inserted [changes ?c ?ast]
+  (logic/all
+    (el/contains changes ?c)
+    (change|insert ?c)
+    (insert-newnode ?c ?ast)))
 
-(defn change-ast|modifies [change ?ast]
-  )
-
+(defn change-ast|renamed [changes ?c ?ast]
+  (logic/fresh [?name]
+    (el/contains changes ?c)
+    (change|insert ?c)
+    (insert-newnode ?c ?name)
+    (jdt/ast :SimpleName ?name)
+    (jdt/ast-parent ?name ?ast)
+    (jdt/has :name ?ast ?name))) ;;verify it is the name property

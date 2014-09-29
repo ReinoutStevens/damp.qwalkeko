@@ -37,7 +37,7 @@ The implementation of the method-moved rule is written in regular core.logic.
   (logic/all
     (is-removed ?moved)
     (jdt/ast :MethodDeclaration ?to)
-    (logic/== ?moved ?to) ;;same signature
+    (method-method|equals ?moved ?to) ;;same signature
     (has-similar-body ?moved ?to)))
 ````
 
@@ -69,7 +69,7 @@ We also ensure that both authors are different. Finally we transition to the nex
 
 ### More examples
 Examples can be found in the experiments and demo folder.
-The two files you want to take a look at are [selenium.clj](https://github.com/ReinoutStevens/damp.qwalkeko/blob/master/src/qwalkeko/experiments/selenium.clj) and [icsme-selenium.clj](https://github.com/ReinoutStevens/damp.qwalkeko/blob/master/src/qwalkeko/demo/icsme_selenium.clj).
+The two files you want to take a look at are [selenium.clj](https://github.com/ReinoutStevens/damp.qwalkeko/blob/master/damp.qwalkeko.plugin/src/qwalkeko/experiments/selenium.clj) and [icsme-selenium.clj](https://github.com/ReinoutStevens/damp.qwalkeko/blob/master/damp.qwalkeko.plugin/src/qwalkeko/demo/icsme_selenium.clj).
 
 
 
@@ -84,10 +84,11 @@ You can find a video demonstration [here](https://github.com/ReinoutStevens/damp
 ## Additional Reading
 We have published papers describing our work using QwalKeko, and prior work using Absinthe (a similar idea implemented in SmallTalk, extending SOUL).
 
-* 
+* [A Logic Foundation for a General-Purpose History Querying Tool](http://soft.vub.ac.be/Publications/2014/vub-soft-tr-14-14.pdf)
 * [Reasoning over the Evolution of Source Code using Quantified Regular Path Expressions](http://soft.vub.ac.be/Publications/2011/vub-soft-tr-11-13.pdf)
 * [A History Querying Tool and its Application to Detect Multi-version Refactorings](http://soft.vub.ac.be/Publications/2013/vub-soft-tr-13-02.pdf)
-* Prevalence and Maintenance of Automated Functional Tests for Web Application (to be published)
+* [Prevalence and Maintenance of Automated Functional Tests for Web Application](http://soft.vub.ac.be/Publications/2014/vub-soft-tr-14-16.pdf)
+* [Querying the History of Software Projects using QwalKeko](http://soft.vub.ac.be/Publications/2014/vub-soft-tr-14-13.pdf)
  
 ## Slides
 You can find most of my presentations on [Slideshare](http://www.slideshare.net/stevensreinout).

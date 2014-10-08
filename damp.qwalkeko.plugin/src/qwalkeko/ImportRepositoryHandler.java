@@ -55,6 +55,7 @@ public class ImportRepositoryHandler extends AbstractHandler {
 					ProcessBuilder pb = new ProcessBuilder("java","-jar", jarString, path, target);
 					Process proc = pb.start();
 					proc.waitFor();
+					project.open(null);
 					damp.util.Natures.addNature(project, HistoryNature.NATURE_ID);
 				} catch (IOException e) {
 					throw new ExecutionException(e.getMessage());

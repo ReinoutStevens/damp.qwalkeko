@@ -77,18 +77,30 @@
 
 
 (defn methoddeclaration|corresponding [left ?right]
-  "finds the corresponding methoddeclartion of left in the current version"
+  "finds the corresponding method declaration of left in the current version"
   ;;probably better to compute changes to detect renames as well
-  (logic/fresh [?left-comp ?right-comp ?leftName ?rightName]
+  (logic/fresh [?left-comp ?right-comp ?left-name ?right-name]
     (logic/project [left]
       (jdt/ast-root left ?left-comp)
       (compilationunit|corresponding ?left-comp ?right-comp)
       (jdt/child+ ?right-comp ?right)
       (jdt/ast :MethodDeclaration ?right)
-      (jdt/has :name ?right ?rightName)
-      (jdt/has :name left ?leftName)
-      (jdt/name|simple-name|simple|same ?leftName ?rightName))))
+      (jdt/has :name ?right ?right-name)
+      (jdt/has :name left ?left-name)
+      (jdt/name|simple-name|simple|same ?left-name ?right-name))))
 
+(defn methoddeclaration|added [left-cu ?right-method]
+  "right-method is added in the corresponding compilation unit of left-cu in the current version.
+   currently only verifies no method with the same name was present, even though signatures may be different"
+  (logic/fresh [?left-method ?left-name ?right-name]
+    (jdt/ast :MethodDeclaration ?right-method)
+    (jdt/has :name ?right-method ?right-name)
+    (damp.ekeko.logic/fails
+      (logic/all
+        (jdt/child+ left-cu ?left-method)
+        (jdt/ast :MethodDeclaration ?left-method)
+        (jdt/has :name ?left-method ?left-name)
+        (jdt/name|simple-name|simple|same ?left-name ?right-name)))))
 
 ;;similarity
 (defn levenshtein [left right]
@@ -132,4 +144,13 @@
 (defn ast-ast|usim-similar [left right]
   (logic/project [left right]
     (logic/== true (usim-similar? left right))))
+
+(defn method-method|clones [?methodA ?methodB]
+  (logic/fresh [?bodyA ?bodyB]
+    (jdt/ast :MethodDeclaration ?methodA)
+    (jdt/ast :MethodDeclaraton ?methodB)
+    (logic/!= ?methodA ?methodB)
+    (jdt/has :body ?methodA ?bodyA)
+    (jdt/has :body ?methodB ?bodyB)
+    (ast-ast|usim-similar ?bodyA ?bodyB)))
 

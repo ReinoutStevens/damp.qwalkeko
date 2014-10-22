@@ -180,21 +180,21 @@
 
 
 (defn meh [changes ?renamed ?inserted]
-  (logic/fresh
-    []
-    (change/change-ast|inserted changes ?insertchange  ?inserted)
-    (jdt/ast :MethodDeclaration ?inserted)
-    (change/ast|renamed changes ?renamechange ?renamed)
-    (
+(logic/fresh
+  []
+  (change/change-ast|inserted changes ?insertchange  ?inserted)
+  (jdt/ast :MethodDeclaration ?inserted)
+  (change/ast|renamed changes ?renamechange ?renamed)
+  (
     
-    (el/contains changes ?insert-name-change)
-    (change/change|insert ?insert-name-change)
-    (change/insert-newnode ?insert-name-change ?insert-name)
-    (jdt/ast :SimpleName ?insert-name)
-    (jdt/ast-parent ?insert-name ?method)
-    (jdt/ast :MethodDeclaration ?method)
-    (jdt/has :name ?method ?insert-name)
-    (el/contains changes ?insert-change)
+  (el/contains changes ?insert-name-change)
+  (change/change|insert ?insert-name-change)
+  (change/insert-newnode ?insert-name-change ?insert-name)
+  (jdt/ast :SimpleName ?insert-name)
+  (jdt/ast-parent ?insert-name ?method)
+  (jdt/ast :MethodDeclaration ?method)
+  (jdt/has :name ?method ?insert-name)
+  (el/contains changes ?insert-change)
     
 ;;detecting extracted methods from clones
 
@@ -234,5 +234,30 @@
           (ast/methoddeclaration|corresponding ?methodB ?rightMethodB)
           (change/changes ?changesA ?methodA ?rightMethodA)
           (change/changes ?changesB ?methodB ?rightMethodB))))))
-  
+
+
+
+;;extract method
+;;given: a clone instance (or partially cloned) from which cloned part is extracted into extracted method
+(defn class-method|named|named [?class ?method ?cstrname ?mstrname]
+  (logic/fresh [?cname ?mname]
+    (jdt/ast :TypeDeclaration ?class)
+    (jdt/has :name ?class ?cname)
+    (jdt/name|simple-string ?cname ?cstrname)
+    (ast/child+-iter ?class ?method)
+    (jdt/ast :MethodDeclaration ?method)
+    (jdt/has :name ?method ?mname)
+    (jdt/name|simple-string ?mname ?mstrname)))
+
+
+(defn compute-changes [graph start classname methodname]
+  (l/qwalkeko* [?end ?changes]
+    (qwal/qwal graph start ?end [?left-class ?left-method ?right-class ?right-method]
+      (l/in-source-code [curr]
+        (class-method|named|named ?left-class ?left-method classname methodname))
+      qwal/q=>
+      (l/in-source-code [curr]
+        (class-method|named|named ?right-class ?right-method classname methodname)
+        (ast/method-method|same-signature ?left-method ?right-method)
+        (change/changes ?changes ?left-method ?right-method)))))
       

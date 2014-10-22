@@ -1,7 +1,24 @@
 (ns qwalkeko.clj.ast
   (:require [clojure.core.logic :as logic])
+  (:require [damp.ekeko.logic :as el])
   (:require [damp.ekeko.jdt
-             [ast :as jdt]]))
+             [ast :as jdt]
+             [astnode :as astnode]]))
+
+;;proper clojure integration for ast/has
+
+(defn ast-clj? [keyword node]
+  "returns whether node is an instance of keyword"
+  (instance? (astnode/class-for-ekeko-keyword keyword) node))
+
+(defn has-clj [keyword node]
+  (if (nil? node)
+    nil
+    (let [f (keyword (astnode/reifiers node))]
+      (if f
+        (f node)
+        nil))))
+
 
 ;;modifiers
 
@@ -31,6 +48,18 @@
 (make-modifier transient?)
 (make-modifier volatile?)
 
+;;improved performance?
+(defn child+-iter [node child]
+  (logic/all
+    (logic/conda
+      [(logic/lvaro node)
+       (jdt/child+ node child)]
+      [(logic/nonlvaro node)
+       (logic/project [node]
+         (el/contains
+           (iterator-seq 
+             (new changenodes.comparing.BreadthFirstNodeIterator node))
+           child))])))
 
 (defn compilationunit-packagedeclaration [?compunit ?package]
   (logic/all
@@ -102,6 +131,7 @@
         (jdt/has :name ?left-method ?left-name)
         (jdt/name|simple-name|simple|same ?left-name ?right-name)))))
 
+
 ;;similarity
 (defn levenshtein [left right]
   (org.apache.commons.lang3.StringUtils/getLevenshteinDistance
@@ -148,9 +178,67 @@
 (defn method-method|clones [?methodA ?methodB]
   (logic/fresh [?bodyA ?bodyB]
     (jdt/ast :MethodDeclaration ?methodA)
-    (jdt/ast :MethodDeclaraton ?methodB)
+    (jdt/ast :MethodDeclaration ?methodB)
     (logic/!= ?methodA ?methodB)
     (jdt/has :body ?methodA ?bodyA)
     (jdt/has :body ?methodB ?bodyB)
     (ast-ast|usim-similar ?bodyA ?bodyB)))
 
+(defn type-type|same [?typeA ?typeB]
+  "Checks whether both types have the same name.
+   Could be done smarter by using bindings, but these are not always available"
+  (logic/fresh [?nameA ?nameB]
+    (jdt/ast :Type ?typeA)
+    (jdt/ast :Type ?typeB)
+    (jdt/has :name ?typeA ?nameA)
+    (jdt/has :name ?typeB ?nameB)
+    (jdt/name|simple-name|simple|same ?nameA ?nameB)))
+
+
+(defn vardecl-vardecl|same-type [?varA ?varB]
+  (logic/fresh [?typeA ?typeB]
+    (jdt/ast :SingleVariableDeclaration ?varA)
+    (jdt/ast :SingleVariableDeclaration ?varB)
+    (jdt/has :type ?varA ?typeA)
+    (jdt/has :type ?varB ?typeB)
+    (type-type|same ?typeA ?typeB)))
+
+(comment
+  (logic/fresh [?headA ?restA ?headB ?restB]
+    (logic/conda 
+      [(logic/emptyo ?signatureA)
+       (logic/emptyo ?signatureB)]
+      [(logic/conso ?headA ?restA ?signatureA)
+       (logic/conso ?headB ?restB ?signatureB)
+       (vardecl-vardecl|same-type ?headA ?headB)
+       (signaturelist-signaturelist|same ?restA ?restB)])))
+
+(defn signaturelist-signaturelist|same [?signatureA ?signatureB]
+  "Non-relational. Both arguments are a list containing SingleVariableDeclarations.
+   Checks whether both lists have the same types for each argument."
+  (defn signatures-same? [sigA sigB]
+    (if (not= (count sigA) (count sigB))
+      false
+      (every? (fn [[a b]] 
+               (= 
+                 (:value (->> a
+                           (has-clj :type)
+                           (has-clj :name)
+                           (has-clj :identifier)))
+                 (:value (->> b
+                           (has-clj :type)
+                           (has-clj :name)
+                           (has-clj :identifier)))))
+        (zipmap ?signatureA ?signatureB))))
+  (logic/project [?signatureA ?signatureB]
+    (logic/== true (signatures-same? ?signatureA ?signatureB))))
+
+
+(defn method-method|same-signature [?methodA ?methodB]
+ (logic/fresh [?signatureA ?signatureB]
+  (jdt/ast :MethodDeclaration ?methodA)
+  (jdt/ast :MethodDeclaration ?methodB)
+  (jdt/has :parameters ?methodA ?signatureA)
+  (jdt/has :parameters ?methodB ?signatureB)
+  (logic/project [?signatureA ?signatureB]
+    (signaturelist-signaturelist|same (seq (:value ?signatureA)) (seq (:value ?signatureB))))))

@@ -149,6 +149,12 @@
     (change|insert ?c)
     (insert-newnode ?c ?ast)))
 
+(defn change-ast|moved [changes ?c ?ast]
+  (logic/all
+    (el/contains changes ?c)
+    (change|move ?c)
+    (move-rightnode ?c ?ast)))
+
 (defn change-ast|renamed [changes ?c ?ast]
   (logic/fresh [?name]
     (el/contains changes ?c)
@@ -157,3 +163,43 @@
     (jdt/ast :SimpleName ?name)
     (jdt/ast-parent ?name ?ast)
     (jdt/has :name ?ast ?name))) ;;verify it is the name property
+
+
+;;higher level predicates
+
+(defn changes-ast|introduced [changes ?c ?ast]
+  "?c introduces a new ast node"
+  ;;insert
+  ;;move
+  (logic/all
+    (el/contains changes ?c)
+    (logic/conde
+      ([change-ast|inserted changes ?c ?ast])
+      ([change-ast|moved changes ?c ?ast]))))
+
+
+
+
+(defn changes-statement-method|extracted [changes ?statement ?method]
+  (logic/fresh [?delete ?insert]
+    (el/contains changes ?delete)
+    (change|delete ?delete)
+    (el/contains changes ?insert)
+    (change|insert ?insert)
+    ))
+    
+    
+
+ 
+(defn changes-method-method|extracted [changes ?source ?extracted]
+  "source is bound in left version, extracted in right"
+  (logic/fresh [?block ?statement]
+    (jdt/ast :MethodDeclaration ?source)
+    (jdt/ast :MethodDeclaration ?extracted)
+    (jdt/has :body ?extracted ?block)
+    ;;ensure there is no single statement inside the block that does not come from source
+    (el/fails 
+      (jdt/child :statements ?block ?statement)
+      ;;TODO
+      )))
+

@@ -20,6 +20,21 @@
         nil))))
 
 
+(defn has-clj-unwrap [keyword node]
+  (let [res (has-clj keyword node)]
+    (if (map? res)
+      (:value res)
+      res)))
+
+;;astmatching
+(defn match? 
+  ([left right]
+    (let [matcher (new org.eclipse.jdt.core.dom.ASTMatcher)]
+      (match? left right matcher)))
+  ([left right matcher]
+    (.subtreeMatch left matcher right)))
+
+
 ;;modifiers
 
 (defmacro make-modifier [name]
@@ -61,6 +76,25 @@
              (new changenodes.comparing.BreadthFirstNodeIterator node))
            child))])))
 
+(defn child+-type [?node ?type ?child]
+  (logic/all
+    (logic/conda
+      [(logic/lvaro ?node)
+       (jdt/child+ ?node ?child)
+       (jdt/ast ?type ?child)]
+      [(logic/lvaro ?type)
+       (jdt/child+ ?node ?child)
+       (jdt/ast ?type ?child)]
+      [(logic/nonlvaro ?node)
+       (logic/project [?node ?type]
+         (el/contains
+           (seq
+             (filter
+               #(ast-clj? type %)
+               (iterator-seq 
+                 (new changenodes.comparing.BreadthFirstNodeIterator ?node))))
+             ?child))])))
+
 (defn compilationunit-packagedeclaration [?compunit ?package]
   (logic/all
     (jdt/ast :CompilationUnit ?compunit)
@@ -85,51 +119,78 @@
       (logic/membero ?typedeclaration ?types)
       (typedeclaration|public? ?typedeclaration))))
 
+(declare method-method|same-signature method-cu-method-cu|same)
 
-(defn compilationunit|corresponding [ast ?compunit]
-  "finds the corresponding compilationunit of the ast in the current version"
+(defn compilationunit-compilationunit|corresponding [?left ?right]
+  "finds the corresponding compilationunit of the given cu in the current version"
   (logic/fresh [?root ?path ?leftname ?leftpackage ?leftpname ?leftmain 
                 ?rightname ?rightmain ?rightpackage ?rightpname]
-    (logic/project [ast]
-      (jdt/ast-root ast ?root)
-      (jdt/has :package ast ?leftpackage)
+    (logic/all
+      (jdt/ast :CompilationUnit ?left)
+      (jdt/has :package ?left ?leftpackage)
       (jdt/has :name ?leftpackage ?leftpname)
       (compilationunit-typedeclaration|main ?root ?leftmain)
       (jdt/has :name ?leftmain ?leftname)
-      (jdt/ast :CompilationUnit ?compunit)
-      (jdt/has :package ?compunit ?rightpackage)
+      (jdt/ast :CompilationUnit ?right)
+      (jdt/has :package ?right ?rightpackage)
       (jdt/has :name ?rightpackage ?rightpname)
       (jdt/name-name|same|qualified ?leftpname ?rightpname)
-      (compilationunit-typedeclaration|main ?compunit ?rightmain)
+      (compilationunit-typedeclaration|main ?right ?rightmain)
       (jdt/has :name ?rightmain ?rightname)
       (jdt/name-name|same|qualified ?leftname ?rightname))))
 
 
-(defn methoddeclaration|corresponding [left ?right]
+(defn method-cu-method-cu|corresponding [?left-method left ?right-method right]
   "finds the corresponding method declaration of left in the current version"
   ;;probably better to compute changes to detect renames as well
-  (logic/fresh [?left-comp ?right-comp ?left-name ?right-name]
-    (logic/project [left]
-      (jdt/ast-root left ?left-comp)
-      (compilationunit|corresponding ?left-comp ?right-comp)
-      (jdt/child+ ?right-comp ?right)
-      (jdt/ast :MethodDeclaration ?right)
-      (jdt/has :name ?right ?right-name)
-      (jdt/has :name left ?left-name)
-      (jdt/name|simple-name|simple|same ?left-name ?right-name))))
+  (logic/fresh [?left-name ?right-name]
+    (child+-type left :MethodDeclaration ?left-method )
+    (child+-type right :MethodDeclaration ?right-method)
+    (jdt/has :name ?right-method ?right-name)
+    (jdt/has :name ?left-method ?left-name)
+    (jdt/name|simple-name|simple|same ?left-name ?right-name)
+    (method-method|same-signature ?left-method ?right-method)))
 
-(defn methoddeclaration|added [left-cu ?right-method]
-  "right-method is added in the corresponding compilation unit of left-cu in the current version.
+
+(defn method-cu-method-cu|corresponding [?left-method left ?right-method right]
+   (logic/fresh [?left-method ?left-name ?right-name]
+     (child+-type left :MethodDeclaration ?left-method)
+     (child+-type right :MethodDeclaration ?right-method)
+     (jdt/has :name ?left-method ?left-name)
+     (jdt/has :name ?right-method ?right-name)
+     (jdt/name|simple-name|simple|same ?left-name ?right-name)
+     (method-method|same-signature ?left-method ?right-method)))
+
+(defn method-cu-cu|introduced [?right-method right left]
+  "right-method is added in right-cu and was not presented in left-cu.
    currently only verifies no method with the same name was present, even though signatures may be different"
   (logic/fresh [?left-method ?left-name ?right-name]
-    (jdt/ast :MethodDeclaration ?right-method)
-    (jdt/has :name ?right-method ?right-name)
+    (child+-type right :MethodDeclaration ?right-method)
     (damp.ekeko.logic/fails
-      (logic/all
-        (jdt/child+ left-cu ?left-method)
-        (jdt/ast :MethodDeclaration ?left-method)
-        (jdt/has :name ?left-method ?left-name)
-        (jdt/name|simple-name|simple|same ?left-name ?right-name)))))
+      (method-cu-method-cu|same left ?left-method right ?right-method))))
+
+(defn ast-ast|same [?left ?right]
+  "Succeeds when both ast nodes are the same.
+   For performance reasons make sure both nodes are grounded."
+  (logic/all
+    (jdt/ast :ASTNode ?left)
+    (jdt/ast :ASTNode ?right)
+    (logic/project [?left ?right]
+      (logic/== true (match? ?left ?right)))))
+
+(defn ast-ast|different [?left ?right]
+  "Succeeds when both ast nodes are different.
+   For performance reasons make sure both nodes are grounded."
+  (logic/all
+    (jdt/ast :ASTNode ?left)
+    (jdt/ast :ASTNode ?right)
+    (logic/project [?left ?right]
+      (logic/== false (match? ?left ?right)))))
+
+(defn method-cu-method-cu|modified [?left-method left ?right-method right]
+  (logic/all
+    (method-cu-method-cu|corresponding ?left-method left ?right-method right)
+    (ast-ast|same ?left-method ?right-method)))
 
 
 ;;similarity

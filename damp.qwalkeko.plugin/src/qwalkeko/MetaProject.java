@@ -15,6 +15,8 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 
+import qwalkeko.building.ProjectBuilder;
+
 
 
 public class MetaProject {
@@ -25,7 +27,10 @@ public class MetaProject {
 	private Collection<MetaVersion> roots;
 	private IProject eclipseProject;
 	private MetaProduct metaProduct;
+	private ProjectBuilder builder;
 		
+
+
 	public MetaProject(String name, URI url){
 		this.name = name;
 		this.uri = url;
@@ -59,6 +64,14 @@ public class MetaProject {
 	
 	public MetaProduct getMetaProduct(){
 		return this.metaProduct;
+	}
+	
+	public ProjectBuilder getBuilder() {
+		return builder;
+	}
+
+	public void setBuilder(ProjectBuilder builder) {
+		this.builder = builder;
 	}
 	
 	public void initialize() throws CoreException{

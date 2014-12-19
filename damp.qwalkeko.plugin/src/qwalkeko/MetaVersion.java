@@ -162,7 +162,9 @@ public class MetaVersion {
 				doCloneOperation(sourceLocation, targetLocation);
 				doCheckoutOperation();
 				//eclipse does silly things when a .git is present, especially when you delete that folder later
-				deleteGitFolder(); 
+				deleteGitFolder();
+				//build project
+				metaProject.getBuilder().build(eclipseProject);
 			} 
 		} catch(Exception e){
 			IStatus status = new Status(Status.ERROR, Activator.PLUGIN_ID, e.getMessage(), e);

@@ -8,40 +8,57 @@
   (:require [damp.ekeko.jdt
              [ast :as jdt]]))
 
+;;Converting Java Changes to Clojure Changes (classes prefixed with a C)
+(defrecord CDelete  [operation original copy property index dependency]
+  clojure.core.logic.protocols/IUninitialized
+  (-uninitialized [_] (CDelete. :delete nil nil nil (atom nil) (atom nil))))
+
+(defrecord CMove [operation original copy left-parent right-parent property index dependents dependency]
+  clojure.core.logic.protocols/IUninitialized
+  (-uninitialized [_] (CMove. :move nil nil nil nil nil (atom nil) (atom nil) (atom nil))))
+
+(defrecord CUpdate [operation original copy left-parent right-parent property dependency]
+  clojure.core.logic.protocols/IUninitialized
+  (-uninitialized [_] (CUpdate. :update nil nil nil nil nil (atom nil))))
+
+(defrecord CInsert [operation original copy left-parent right-parent property index dependents dependency]
+  clojure.core.logic.protocols/IUninitialized
+  (-uninitialized [_] (CInsert. :insert nil nil nil nil nil (atom nil) (atom nil) (atom nil))))
+
+(defrecord CListInsert [operation original copy left-parent right-parent property index dependents dependency child]
+  clojure.core.logic.protocols/IUninitialized
+  (-uninitialized [_] (CListInsert. :insert nil nil nil nil nil (atom nil) (atom nil) (atom nil) (atom nil))))
+
+(defrecord CListMove [operation original copy left-parent right-parent property index dependents dependency child]
+  clojure.core.logic.protocols/IUninitialized
+  (-uninitialized [_] (CListMove. :move nil nil nil nil nil (atom nil) (atom nil) (atom nil) (atom nil))))
+
+(defrecord CListDelete  [operation original copy property index dependency child]
+  clojure.core.logic.protocols/IUninitialized
+  (-uninitialized [_] (CListDelete. :delete nil nil nil (atom nil) (atom nil) (atom nil))))
 
 
-
-;;Changes
-(defrecord CDelete  [operation original copy index property dependent-on])
-(defrecord CMove [operation original copy left-parent right-parent property index dependencies dependent-on])
-(defrecord CUpdate [operation original copy left-parent right-parent property dependent-on])
-(defrecord CInsert [operation original copy left-parent right-parent property index dependencies dependent-on])
-
-(defrecord CListInsert [operation original copy left-parent right-parent property index dependencies dependent-on child])
-(defrecord CListMove [operation original copy left-parent right-parent property index dependencies dependent-on child])
-(defrecord CListDelete  [operation original copy index property dependent-on child])
-
-
+;;Custom Printing so we do not get stuck in printing cycles
 (defmethod print-method CInsert [x ^java.io.Writer writer]
-  (print-method (dissoc x :dependencies :dependent-on) writer))
+  (print-method (dissoc x :dependents :dependency) writer))
 
 (defmethod print-method CMove [x ^java.io.Writer writer]
-  (print-method (dissoc x :dependencies :dependent-on) writer))
+  (print-method (dissoc x :dependents :dependency) writer))
 
 (defmethod print-method CDelete [x ^java.io.Writer writer]
-  (print-method (dissoc x :dependent-on) writer))
+  (print-method (dissoc x :dependency) writer))
 
 (defmethod print-method CUpdate [x ^java.io.Writer writer]
-  (print-method (dissoc x :dependent-on) writer))
+  (print-method (dissoc x :dependency) writer))
 
 (defmethod print-method CListMove [x ^java.io.Writer writer]
-  (print-method (dissoc x :dependencies :dependent-on :child) writer))
+  (print-method (dissoc x :dependents :dependency :child) writer))
 
 (defmethod print-method CListInsert [x ^java.io.Writer writer]
-  (print-method (dissoc x :dependencies :dependent-on :child) writer))
+  (print-method (dissoc x :dependents :dependency :child) writer))
 
 (defmethod print-method CListDelete [x ^java.io.Writer writer]
-  (print-method (dissoc x :dependent-on :child) writer))
+  (print-method (dissoc x :dependency :child) writer))
 
 (defn convert-index [idx]
   (if (< idx 0)
@@ -50,8 +67,6 @@
 
 (defn convert-property [property]
   (astnode/ekeko-keyword-for-property-descriptor property))
-
-
 
 (defn get-node-idx [node property idx]
   (if (nil? idx)
@@ -67,9 +82,9 @@
            :copy (.getAffectedNode operation)
            :index idx
            :property (convert-property (.getLocationInParent (.getOriginal operation)))
-           :dependent-on (atom nil)}]
+           :dependency (atom nil)}]
     (if idx
-      (map->CDelete (assoc m :child (atom nil)))
+      (map->CListDelete (assoc m :child (atom nil)))
       (map->CDelete m))))
 
 (defmethod convert-operation Insert [operation]
@@ -83,8 +98,8 @@
            :right-parent  (.getRightParent operation)
            :property prop
            :index idx
-           :dependencies (atom {})
-           :dependent-on (atom nil)}]
+           :dependents (atom {})
+           :dependency (atom nil)}]
     (if idx
       (map->CListInsert (assoc m :child (atom nil)))
       (map->CInsert m))))
@@ -99,8 +114,8 @@
            :right-parent (.getNewParent operation)
            :property prop
            :index idx
-           :dependencies (atom {})
-           :dependent-on (atom nil)}]
+           :dependents (atom {})
+           :dependency (atom nil)}]
     (if idx
       (map->CListMove (assoc m :child (atom nil)))
       (map->CMove m))))
@@ -132,6 +147,14 @@
 (defn list-operation? [x]
   (not= nil (:child x)))
 
+(defn updateo [x]
+  (logic/project [x]
+    (logic/== true (update? x))))
+
+(defn inserto [x]
+  (logic/project [x]
+    (logic/== true (insert? x))))
+
 ;;Clojure Functions
 
 (defn make-differencer [left-ast right-ast]
@@ -156,43 +179,13 @@
     (.apply updated-change)))
 
 
-(defn insert-dependent-on [insert]
-  @(:dependent-on insert))
-
-(defn insert-dependencies [insert]
-  @(:dependencies insert))
-
-(defmulti change-index-if-removed (fn [operation idx] (class operation)))
-(defmethod change-index-if-removed CInsert [operation idx]
-  (dec idx))
-
-(defmethod change-index-if-removed CMove [operation idx]
-  (dec idx))
-
-(defmethod change-index-if-removed CUpdate [operation idx]
-  idx)
-
-(defmethod change-index-if-removed CDelete [operation idx]
-  (inc idx))
-
-(defn insert-get-independent-index [insert]
-  (defn find-parent-and-update-idx [idx parentnode current]
-    (if (or (not= parentnode (:original current)) (nil? current))
-      idx
-      (recur (change-index-if-removed current idx) parentnode @(:dependent-on current))))
-  (let [original (:original insert)]
-    (if-let [idx (:index insert)]
-      (find-parent-and-update-idx @idx original @(:dependent-on insert))
-      nil)))
-
-
 (defn insert-add-dependency [insert dependee]
   "dependee depends on insert"
   (let [prop (:property dependee)]
-    (swap! (:dependencies insert)
+    (swap! (:dependents insert)
       (fn [h]
         (assoc h prop dependee)))
-    (reset! (:dependent-on dependee) insert)))
+    (reset! (:dependency dependee) insert)))
     
 
 
@@ -214,49 +207,20 @@
 (defmethod insert-change-dependent? CListInsert [insert listinsert]
   (and  
     (= (:left-parent listinsert) (:copy insert))
-    (nil? ((:property listinsert) @(:dependencies insert)))))
+    (nil? ((:property listinsert) @(:dependents insert)))))
 
 (defmethod insert-change-dependent? CListMove [insert listmove]
   (and  
     (= (:left-parent listmove) (:copy insert))
-    (nil? ((:property listmove) @(:dependencies insert)))))
+    (nil? ((:property listmove) @(:dependents insert)))))
 
 
 (defmethod insert-change-dependent? CListDelete [insert listdelete]
   false)
 
-
-(defn insert-remove-dependency [insert dependency]
-  (let [prop (:property dependency)
-        all-deps (insert-dependent-on insert)
-        deps (prop (insert-dependencies insert))
-        idx (.indexOf deps dependency)
-        [t d] (split-at idx deps)]
-      (if-not (nil? (:index dependency))
-        (swap! (:dependencies insert) (fn [h val] (assoc h prop (concat t (map #(swap! (:index %) dec) (rest d))))))
-        (swap! (:dependencies insert) (fn [h val] (assoc h prop (concat t (rest d))))))))
-
-
-
-
-(defn insert-delete-redundant? [insert delete]
-  (if-let [delete-original (:original delete)]
-    (if-let [insert-parent (:original insert)]
-      (let [delete-parent (.getParent delete-original)
-            insert-left (get-node-idx (:right-parent insert) (:property insert) (:index insert))]
-        (if (= delete-parent insert-parent)
-          (if (ast/match? delete-original insert-left) ;;nodes look the same
-            ;;lets verify that they are added at the same position
-            (if (and (:index insert) (:index delete))
-              (= (insert-get-independent-index insert) @(:index delete))
-              false)
-            false)
-          false))
-      false)
-    false))
               
 
-(defn insert-link-direct-dependencies [changes]
+(defn insert-link-direct-dependents [changes]
   "links ChildProperty to an insert"
   (let [inserts (filter insert? changes)]
     (doall
@@ -271,12 +235,12 @@
         inserts))))
 
 
-(defn link-list-dependencies [changes]
+(defn link-list-dependents [changes]
   "links operations in the same ChildListProperty in a linked list (without deletes)"
   (defn link-group [group]
     (reduce
       (fn [parent child]
-        (reset! (:dependent-on child) parent)
+        (reset! (:dependency child) parent)
         (reset! (:child parent) child)
         child)
       group))
@@ -287,7 +251,7 @@
         (mapcat #(vals (group-by :property %)) (vals grouped))))))
 
 
-(defn link-delete-dependencies [changes]
+(defn link-delete-dependents [changes]
   "adds deletes to groups of linked operations"
   (defn link-delete-group [group]
     (defn loop-and-add [prev current group]
@@ -296,7 +260,7 @@
           (let [gcurr (first group)] ;;probably better to write with reduce
             (when-not (nil? prev)
               (reset! (:child prev) gcurr)
-              (reset! (:dependent-on gcurr) prev))
+              (reset! (:dependency gcurr) prev))
             (recur gcurr nil (rest group)))
           (let [gcurr (first group)
                 gidx @(:index gcurr)
@@ -305,8 +269,8 @@
               (do
                 (when-not (nil? prev)
                   (reset! (:child prev) gcurr)
-                  (reset! (:dependent-on gcurr) prev))
-                (reset! (:dependent-on current) gcurr)
+                  (reset! (:dependency gcurr) prev))
+                (reset! (:dependency current) gcurr)
                 (reset! (:child gcurr) current)
                 (recur gcurr current (rest group)))
               (recur current @(:child current) group))))))
@@ -332,26 +296,226 @@
   (defn find-and-set-root [operation roots]
     (let [root (some #(= (:copy %) (:left-parent operation)) roots)]
       (when-not (nil? root)
-        (reset! (:dependent-on operation) root)
-        (swap! (:dependencies root)
+        (reset! (:dependency operation) root)
+        (swap! (:dependents root)
           (fn [h]
             (assoc h (:property operation) operation))))))
   (let [possible-roots (remove list-operation? (filter insert? changes))
         ;;deletes should never be inside an insert as the node shouldnt get inserted in the first place
-        list-roots (remove delete? (filter #(nil? (:dependent-on %)) (filter list-operation? changes)))] 
+        list-roots (remove delete? (filter #(nil? (:dependency %)) (filter list-operation? changes)))] 
     (doall
       (map #(find-and-set-root % possible-roots) list-roots))))
 
 
 (defn create-dependency-graph [changes]
   (defn graphify []
-    (let [roots (filter #(nil? @(:dependent-on %)) changes)]
+    (let [roots (filter #(nil? @(:dependency %)) changes)]
       {:roots roots :changes changes}))
-  (insert-link-direct-dependencies changes)
-  (link-list-dependencies changes)
-  (link-delete-dependencies changes)
+  (insert-link-direct-dependents changes)
+  (link-list-dependents changes)
+  (link-delete-dependents changes)
   (link-group-roots changes)
   (graphify))
         
+
+(defn ast-ast-graph [left right]
+  (let [changes (get-ast-changes left right)]
+    (create-dependency-graph changes)))
+
+;;Graph helpers
+(defn change-graph-roots [graph]
+  (:roots graph))
+
+(defn change-graph-dependencies [graph]
+  (remove #(nil? @(:dependency %)) (:changes graph)))
+
+
+;;qwal integration to navigate changes a bit better
+(defn change-root [?root graph]
+  (logic/project [graph]
+    (damp.ekeko.logic/contains (:roots graph) ?root)))
+
+(defn change [?change graph]
+  (logic/project [graph]
+    (damp.ekeko.logic/contains (:changes graph) ?change)))
+
+
+(defn change=>> []
+  (fn [graph change ?dependent]
+    (logic/fresh [?prop]
+      (logic/project [change]
+        (logic/fresh [?map]
+          (logic/== false (update? change))
+          (logic/== ?map (:dependents change))
+          (logic/project [?map]
+            (damp.ekeko.logic/contains (seq (keys @?map)) ?prop)
+            (logic/project [?prop]
+              (logic/== ?dependent (?prop @(:dependents change))))))))))
+
+(defn change=> [?prop]
+  (fn [graph change ?dependent]
+    (logic/project [change]
+      (logic/fresh [?map]
+        (logic/== false (update? change))
+        (logic/== ?map (:dependents change))
+        (logic/project [?map]
+	          (damp.ekeko.logic/contains (seq (keys @?map)) ?prop)
+           (logic/project [?prop]
+             (logic/== ?dependent (?prop @(:dependents change)))))))))
+
+
+(defn change<= []
+  (fn [graph change ?dependency]
+    (logic/project [change]
+      (logic/fresh [?map]
+        (logic/== ?map (:dependency change))
+        (logic/project [?map]
+          (logic/== ?dependency @?map)
+          (logic/!= nil ?dependency))))))
+
+(defn change=c> []
+  (fn [graph listchange ?dependent]
+    (logic/project [listchange]
+      (logic/fresh [?c]
+        (logic/== true (list-operation? listchange))
+        (logic/== ?c (:child listchange))
+        (logic/project [?c]
+          (logic/== ?dependent @?c))))))
+
+(defn change=c< [] 
+  (fn [graph listchange ?dependency]
+    (logic/project [listchange]
+      (logic/== true (list-operation? listchange))
+      (logic/fresh [?c]
+        (logic/== ?c (:dependency listchange))
+        (logic/project [?c]
+          (logic/== ?dependency @?c))))))
     
-          
+
+
+    
+;;Operations that work on changes that are already in a graph
+(defn list-operation-parent-operation [x]
+  (when (list-operation? x)
+    (cons x (lazy-seq (list-operation-parent-operation @(:dependency x))))))
+
+(defn list-operation-children [x]
+  (when (list-operation? x)
+    (cons x (lazy-seq (list-operation-children @(:child x))))))
+
+
+(defn change-dependents-recursive [change]
+  (let [deps-atom (:dependents change)]
+    (when deps-atom
+      (let [deps (vals @deps-atom)]
+        (concat deps (mapcat change-dependents-recursive deps))))))
+
+
+(defmulti change-index-if-removed (fn [operation idx] (class operation)))
+(defmethod change-index-if-removed :default [operation idx]
+  idx)
+
+(defmethod change-index-if-removed CListInsert [operation idx]
+  (dec idx))
+
+(defmethod change-index-if-removed CListMove [operation idx]
+  (dec idx))
+
+(defmethod change-index-if-removed CListDelete [operation idx]
+  (inc idx))
+
+(defn change-get-independent-index [operation]
+  (let [idx (:index operation)]
+    (when idx
+      (reduce (fn [idx op] (change-index-if-removed op idx)) @idx (rest (list-operation-parent-operation operation))))))
+
+
+(defn change-remove [graph change]
+   (defn change-remove-regular [change]
+     (let [parent @(:dependency change)]
+       (when parent
+         (swap! (:dependents parent) #(dissoc % (:property change))))
+       (reset! (:dependency change) nil)
+       {:roots (remove #{change}  (:roots graph))
+        :changes (remove (set (conj (change-dependents-recursive change) change)) (:changes graph))}))
+   
+  (defn change-remove-list [change]
+    (let [prev @(:dependency change)
+          next @(:child change)]
+      (when next
+        (reset! (:dependency next) prev)
+        (doall (map #(swap! (:index %) (fn [idx c] (change-index-if-removed c idx)) change) (list-operation-children next))))
+      (when prev
+        (if (list-operation? prev)
+          (reset! (:child prev) next)
+          (swap! (:dependents prev) #(dissoc % (:property change)))))
+      {:roots (remove #{change} (:roots graph))
+       :changes (remove (set (conj (change-dependents-recursive change) change)) (:changes graph))}))
+  (if (list-operation? change)
+    (change-remove-list change)
+    (change-remove-regular change)))
+
+
+
+
+(defn insert-delete-redundant? [insert delete]
+  (if-let [delete-original (:original delete)]
+    (if-let [insert-parent (:original insert)]
+      (let [delete-parent (.getParent delete-original)
+            insert-left (get-node-idx (:right-parent insert) (:property insert) (:index insert))]
+        (if (= delete-parent insert-parent)
+          (if (ast/match? delete-original insert-left) ;;nodes look the same
+            ;;lets verify that they are added at the same position
+            (if (and (:index insert) (:index delete))
+              (= (change-get-independent-index insert) @(:index delete))
+              false)
+            false)
+          false))
+      false)
+    false))
+
+
+(defn insert-has-redundant-delete? [insert]
+  (let [child @(:child insert)]
+    (and 
+      (delete? child)
+      (= (change-get-independent-index insert) 
+        (change-get-independent-index child))
+      (ast/match? (:copy insert) (:original child)))))
+
+(defn delete-has-redundant-insert? [delete]
+  (let [child @(:child delete)]
+    (and
+      (insert? child)
+      (= (change-get-independent-index delete) 
+        (change-get-independent-index child))
+      (ast/match? (:copy child) (:original delete)))))
+
+
+(defn remove-redundant-operations [graph]
+  (defn remove-redundant-operation [graph change]
+    (let [next @(:child change)]
+      (change-remove (change-remove graph next) change)))
+  (let [changes (:changes graph)
+        list-operations (filter list-operation? changes)
+        list-inserts (filter insert? list-operations)
+        list-delete (filter delete? list-operations)
+        redundant-inserts (filter insert-has-redundant-delete? list-inserts)
+        redundant-deletes (filter delete-has-redundant-insert? list-delete)]
+    (reduce remove-redundant-operation graph (concat redundant-deletes redundant-inserts))))
+        
+        
+
+
+
+(comment
+  (logic/run* [?cu]
+ (logic/fresh [?typedecl ?tname ?package ?pname]
+   (jdt/ast :CompilationUnit ?cu)
+   (jdt/has :package ?cu ?package)
+   (jdt/has :name ?package ?pname)
+   (jdt/name|qualified-string ?pname "org.apache.tools.ant")
+   (ast/compilationunit-typedeclaration|main ?cu ?typedecl)
+   (jdt/has :name ?typedecl ?tname)
+   (jdt/name|simple-string ?tname "DirectoryScanner"))))
+

@@ -4,7 +4,7 @@
   (:require [qwalkeko.clj.reification :as r])
   (:require [qwalkeko.clj.graph :as graph])
   (:require [qwalkeko.clj.ast :as ast])
-  (:require [qwalkeko.clj.changes :as change])
+  (:require [qwalkeko.clj.functionalnodes :as change])
   (:require [damp.ekeko.jdt
              [ast :as jdt]
              [convenience :as conv]])
@@ -71,7 +71,7 @@
         (jdt/name|simple-string ?tname "DirectoryScanner"))
       qwal/q<=
       (l/in-source-code [c]
-        (ast/compilationunit|corresponding ?right ?left)))))
+        (ast/compilationunit-compilationunit|corresponding ?right ?left)))))
 
 (def left-ast (first (first asts)))
 (def right-ast (second (first asts)))
@@ -239,17 +239,6 @@
 
 ;;extract method
 ;;given: a clone instance (or partially cloned) from which cloned part is extracted into extracted method
-(defn class-method|named|named [?class ?method ?cstrname ?mstrname]
-  (logic/fresh [?cname ?mname]
-    (jdt/ast :TypeDeclaration ?class)
-    (jdt/has :name ?class ?cname)
-    (jdt/name|simple-string ?cname ?cstrname)
-    (ast/child+-iter ?class ?method)
-    (jdt/ast :MethodDeclaration ?method)
-    (jdt/has :name ?method ?mname)
-    (jdt/name|simple-string ?mname ?mstrname)))
-
-
 (defn compute-changes [graph start classname methodname]
   (l/qwalkeko* [?end ?changes]
     (qwal/qwal graph start ?end [?left-class ?left-method ?right-class ?right-method]
@@ -260,4 +249,95 @@
         (class-method|named|named ?right-class ?right-method classname methodname)
         (ast/method-method|same-signature ?left-method ?right-method)
         (change/changes ?changes ?left-method ?right-method)))))
+
+
+
+;;Crappy Queries for the Paper
+(defn class|named [?class ?cstrname]
+  (logic/fresh [?cname]
+    (jdt/ast :TypeDeclaration ?class)
+    (jdt/has :name ?class ?cname)
+    (jdt/name|simple-string ?cname ?cstrname)))
+
+(defn method|named [?method ?mstrname]
+  (logic/fresh [?mname]
+    (jdt/ast :MethodDeclaration ?method)
+    (jdt/has :name ?method ?mname)
+    (jdt/name|simple-string ?mname ?mstrname)))
+
+
+(defn class-method|named|named [?class ?method ?cstrname ?mstrname]
+  (logic/all
+    (class|named ?class ?cstrname)
+    (ast/child+-iter ?class ?method)
+    (jdt/ast :MethodDeclaration ?method)
+    (method|named ?method ?mstrname)))
+
+
+(defn detect-refactoring [graph root]
+  (l/qwalkeko* [?left ?right ?lincludes ?lexcludes ?rincludes ?rexcludes ?rnormalize]
+    (logic/fresh [?next]
+      (qwal/qwal graph root ?next [?lclass ?rclass]
+        (l/in-source-code [curr]
+          (class-method|named|named ?lclass ?lincludes "DirectoryScanner" "setIncludes")
+          (class-method|named|named ?lclass ?lexcludes "DirectoryScanner" "setExcludes")
+          (jdt/ast-root ?lclass ?left))
+        qwal/q=>
+        (l/in-source-code [curr]
+          (jdt/ast :CompilationUnit ?right)
+          (class-method|named|named ?rclass ?rincludes "DirectoryScanner" "setIncludes")
+          (class-method|named|named ?rclass ?rexcludes "DirectoryScanner" "setExcludes")
+          (class-method|named|named ?rclass ?rnormalize "DirectoryScanner" "setExcludes")
+          (jdt/ast-root ?lclass ?right))))))
+
+
+(defn change-pattern [changes lincludes lexcludes rincludes rexcludes]
+  (logic/run* [?insertMethod ?insertIncCall ?insertExcCall ?deleteInc ?deleteExc ?moveBody]
+    (logic/fresh [?insertMDecl ?cNormalize ?normalizeBody ?insertMDeclName
+                  ?moveBody ?deleteIncludesClone ]
+                  
+      (el/contains changes ?insertMethod)
+      (change/change|insert ?insertMDecl)
+      (change/change-copy ?insertMDecl ?cNormalize)
+      (jdt/ast :MethodDeclaration ?cNormalize)
+      (jdt/has :body ?cNormalize ?normalizeBody)
+      (jdt/has :name ?insertMDecl ?insertMDeclName)
+      (jdt/name|simple-string ?rincludeCallName ?insertMDeclName)
+      
+      (el/contains changes ?moveBody)
+      (change/change|move ?moveBody)
+      (change/change-copy ?moveBody ?normalizeBody)
+      
+      (el/contains changes ?deleteIncludesClone)
+      (change/change|delete ?deleteIncludesClone)
+      (change/change|original ?deleteIncludesClone ?deleteIncludes)
+      (change/change|delete ?deleteExcludesClone)
+      (change/change-original ?deleteIncludesClone ?deleteExcludes)
+      (logic/!= ?deleteIncludes ?deleteExcludes)
+      (jdt/ast-parent+ ?deleteIncludes lincludes)
+      (jdt/ast-parent+ ?deleteExcludes lexcludes)
+      (ast/ast-ast|usim-similar ?deleteIncludes ?deleteExcludes)
+      (jdt/has :body rnormalize ?rnormalizeBody) 
+      (ast/ast-ast|usim-similar ?deleteIncludes ?rnormalizeBody)
+      
+      (el/contains changes ?rincludesInsert)
+      (change/insert-newnode ?rincludesInsert ?rincludeCall)
+      (jdt/ast :MethodInvocation ?rincludeCall)
+      (jdt/has :name ?rincludeCall ?rincludeCallName)
+      (jdt/name|simple-string ?rincludeCallName ?methodName)
+      (jdt/has :name ?insertMDecl ?insertMDeclName)
+      (jdt/name|simple-string ?rincludeCallName ?insertMDeclName)
+      (el/contains changes ?rexcludesInsert)
+      (jdt/ast :MethodInvocation ?rexcludeCall)
+      (jdt/has :name ?rexcludeCall ?rexcludeCallName)
+      (jdt/name|simple-string ?rexcludeCallName ?insertMDeclName)))))))
+
+
+
+
+(run* [?changes ?methodA ?methodB ?extracted]
+  (logic/fresh [?classA ?classB]
+    (class-method|named|named ?classA ?methodA "DirectoryScanner" "setExcludes")
+    (class-method|named|named ?classA ?methodA "DirectoryScanner" "setIncludes")
+    
       

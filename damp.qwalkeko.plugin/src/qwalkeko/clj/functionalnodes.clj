@@ -12,10 +12,6 @@
   (:require [damp.ekeko.jdt
              [ast :as jdt]]))
 
-
-
-
-
 ;;Converting Java Changes to Clojure Changes (classes prefixed with a C)
 (defrecord CDelete  [operation original copy property index graph-idx]
   clojure.core.logic.protocols/IUninitialized
@@ -72,7 +68,7 @@
            :property (convert-property (.getLocationInParent (.getOriginal operation)))
            :graph-idx nil}]
     (if idx
-      (map->CListDelete (assoc m :child nil))
+      (map->CListDelete m)
       (map->CDelete m))))
 
 (defmethod convert-operation Insert [operation]
@@ -88,7 +84,7 @@
            :index idx
            :graph-idx nil}]
     (if idx
-      (map->CListInsert (assoc m :child nil))
+      (map->CListInsert m)
       (map->CInsert m))))
 
 (defmethod convert-operation Move [operation]
@@ -98,12 +94,12 @@
            :original (.getOriginal operation)
            :copy (.getLeftNode operation)
            :left-parent (.getParent (.getLeftNode operation))
-           :right-parent (.getNewParent operation)
+           :right-parent (.getParent (.getRightNode operation))
            :property prop
            :index idx
            :graph-idx nil}]
     (if idx
-      (map->CListMove (assoc m :child nil))
+      (map->CListMove m)
       (map->CMove m))))
 
 (defmethod convert-operation Update [operation]
@@ -134,12 +130,11 @@
 (defn- right-matching [differencer]
   (.getRightMatching differencer))
 
-(defn- get-ast-changes [left-ast right-ast]
+(defn get-ast-changes [left-ast right-ast]
   (let [differencer (make-differencer left-ast right-ast)
         converted (seq (map convert-operation (get-operations (difference differencer))))]
     {:changes converted 
      :differencer differencer}))
-
 
 ;;Some useful functions
 (defn insert? [x]
@@ -174,7 +169,6 @@
      :child (vec (take size (repeat nil)))
      :differencer (:differencer changes)}))
 
-
 (defn graph-node-idx [graph idx]
   (when-not (nil? idx)
     (nth (:changes graph) idx)))
@@ -207,11 +201,40 @@
         property (:property dependent)
         dependents (:dependents graph)
         dependent-map (nth dependents idx)
+        copy (:copy change)
+        all-parents (iterate #(.getParent %) (:left-parent dependent))
+        parents (take-while (fn [x] (not= x copy)) all-parents)
+        properties (cons property (map #(astnode/ekeko-keyword-for-property-descriptor 
+                                         (.getLocationInParent %)) parents))
+        new-dependents (assoc dependents idx (assoc-in dependent-map properties (:graph-idx dependent)))
+        new-dependency (assoc (:dependency graph) (:graph-idx dependent) idx)]
+    (assoc graph 
+      :dependents new-dependents
+      :dependency new-dependency)))
+
+
+(defn change-add-list-dependency [graph change dependent]
+  (let [idx (:graph-idx change)
+        property (:property dependent)
+        dependents (:dependents graph)
+        dependent-map (nth dependents idx)
+        copy (:copy change)
         new-dependents (assoc dependents idx (assoc dependent-map property (:graph-idx dependent)))
         new-dependency (assoc (:dependency graph) (:graph-idx dependent) idx)]
     (assoc graph 
       :dependents new-dependents
       :dependency new-dependency)))
+
+
+(defn insert-change-already-linked? [graph insert change]
+    (let [property (:property change)
+          all-parents (iterate #(.getParent %) (:left-parent change))
+          copy (:copy insert)
+          parents (take-while (fn [x] (not= x copy)) all-parents)
+          properties (cons property (map #(astnode/ekeko-keyword-for-property-descriptor 
+                                            (.getLocationInParent %)) parents))]
+      (get-in (change-dependents graph insert) properties)))
+      
 
 (defn change-dependents-recursive [graph change]
   (let [changes (change-dependents graph change)]
@@ -239,13 +262,23 @@
        :dependency new-dependency)))
 
 ;;Methods used to set up the graph
+(defn insert-change-dependent-default? [graph insert change]
+   (let [left-parent (:left-parent change)
+        location (.getLocationInParent left-parent)
+        mandatory (and (not (.isChildListProperty location))(.isMandatory location))]
+    (or
+      (= (:left-parent change) (:copy insert))
+      (and mandatory (= (:copy insert)
+                       (.getParent left-parent))))))
+
+    
 (defmulti insert-change-dependent? 
   "dependent depdends on insert. Only used during the creation of the dependency graph." 
   (fn [graph insert dependent] (class dependent)))
 
 (defmethod insert-change-dependent? :default [graph insert change] 
-  (= (:left-parent change) (:copy insert))) 
-    
+  (insert-change-dependent-default? graph insert change))
+
 (defmethod insert-change-dependent? CDelete [graph insert delete]
  false) ;;is done later
 
@@ -255,14 +288,14 @@
     (= (:left-parent depends) (:copy insert))))
 
 (defmethod insert-change-dependent? CListInsert [graph insert listinsert]
-  (and  
-    (= (:left-parent listinsert) (:copy insert))
-    (nil? ((:property listinsert) (change-dependents graph insert)))))
+  (and
+    (insert-change-dependent-default? graph insert listinsert)
+    (not (insert-change-already-linked? graph insert listinsert))))
 
 (defmethod insert-change-dependent? CListMove [graph insert listmove]
   (and  
-    (= (:left-parent listmove) (:copy insert))
-    (nil? ((:property listmove) (change-dependents graph insert)))))
+    (insert-change-dependent-default? graph insert listmove)
+    (not (insert-change-already-linked? graph insert listmove))))
 
 (defmethod insert-change-dependent? CListDelete [graph insert listdelete]
   false)
@@ -292,7 +325,7 @@
         (fn [graph pc]
           (let [parent (first pc)
                 child (second pc)]
-            (change-add-child (change-add-dependency graph child parent) parent child)))
+            (change-add-child (change-add-list-dependency graph child parent) parent child)))
         graph
         parent-child)))
   (let [changes (:changes graph)
@@ -319,7 +352,7 @@
                 new-graph (if-not (nil? prev)
                             (-> graph
                               (change-add-child prev gcurr)
-                              (change-add-dependency gcurr prev))
+                              (change-add-list-dependency gcurr prev))
                             graph)]
             (recur new-graph gcurr nil (rest group)))
           (let [gcurr (first group)
@@ -330,13 +363,13 @@
               (let [current-added-graph
                     (->
                       graph
-                      (change-add-dependency current gcurr) 
+                      (change-add-list-dependency current gcurr) 
                       (change-add-child gcurr current))
                     prev-added-graph
                     (if-not (nil? prev)
                       (-> current-added-graph
                         (change-add-child prev gcurr)
-                        (change-add-dependency gcurr prev))
+                        (change-add-list-dependency gcurr prev))
                       current-added-graph)]
                 (recur prev-added-graph gcurr current (rest group)))
               (recur graph current (change-child graph current) group))))
@@ -392,7 +425,7 @@
       add-roots-to-graph)))
 
 (defn ast-ast-graph [left right]
-  (let [changes-differencer (get-ast-changes left right)]
+  (let [changes (get-ast-changes left right)]
     (assoc (create-dependency-graph changes) :differencer (:differencer changes))))
 
 ;;Graph helpers
@@ -722,6 +755,7 @@
              (logic/== ?right (get ?matching ?left))))]))))
 
 
+;;
 
 
 

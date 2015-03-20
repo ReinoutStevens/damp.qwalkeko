@@ -111,7 +111,7 @@
            :original (.getOriginal operation)
            :copy (get-node-idx (.getLeftNode operation) prop idx)
            :left-parent (.getParent (.getLeftNode operation))
-           :right-parent (.getNewParent operation)
+           :right-parent (.getParent (.getRightNode operation))
            :property prop
            :index idx
            :dependents (atom {})

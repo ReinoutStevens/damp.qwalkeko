@@ -52,7 +52,7 @@
         hash-map (java.util.HashMap. ast-map)]
     (.apply jchange (java.util.HashMap.) hash-map)
     (-> graph 
-      (assoc :ast-map (assoc (:ast-map graph) new-ast (into {} hash-map)))
+      (assoc :ast-map (assoc (:ast-map graph) (.getAST new-ast) (into {} hash-map)))
       (assoc :current idx)
       (update-in [:applied] (fn [app] (assoc app idx true))))))
 

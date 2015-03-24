@@ -1,6 +1,6 @@
 (ns qwalkeko.clj.changes
   (:require [clojure.core.logic :as logic])
-  (:require [qwalkeko.clj.changenodes :as nodes])
+  (:require [qwalkeko.clj.functionalnodes :as nodes])
   (:require [damp.ekeko.logic :as el])
   (:require [damp.ekeko.jdt
            [ast :as jdt]]))

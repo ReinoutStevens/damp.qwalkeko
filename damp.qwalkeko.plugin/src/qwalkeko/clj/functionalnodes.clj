@@ -43,7 +43,6 @@
 
 
 ;;Converting Java Operations to Clojure
-
 (defn- convert-index [idx]
   (if (< idx 0)
     nil
@@ -160,7 +159,6 @@
   true)
 
 ;;Make Graph of Change Dependencies
-
 (defn changes->graph [changes]
   (let [size (count (:changes changes))]
     {:changes (vec (map-indexed (fn [idx c] (assoc c :graph-idx idx)) (:changes changes)))
@@ -212,19 +210,15 @@
       :dependents new-dependents
       :dependency new-dependency)))
 
-
 (defn change-add-list-dependency [graph change dependent]
   (let [idx (:graph-idx change)
         property (:property dependent)
         dependents (:dependents graph)
         dependent-map (nth dependents idx)
         copy (:copy change)
-        new-dependents (assoc dependents idx (assoc dependent-map property (:graph-idx dependent)))
         new-dependency (assoc (:dependency graph) (:graph-idx dependent) idx)]
     (assoc graph 
-      :dependents new-dependents
       :dependency new-dependency)))
-
 
 (defn insert-change-already-linked? [graph insert change]
     (let [property (:property change)
@@ -234,12 +228,10 @@
           properties (cons property (map #(astnode/ekeko-keyword-for-property-descriptor 
                                             (.getLocationInParent %)) parents))]
       (get-in (change-dependents graph insert) properties)))
-      
-
+     
 (defn change-dependents-recursive [graph change]
   (let [changes (change-dependents graph change)]
     (mapcat #(change-dependents-recursive graph %) changes)))
-
 
 (defn change-dependents-idx-recursive [graph change]
   (map :graph-idx (change-dependents-recursive graph change)))
@@ -287,15 +279,22 @@
     (not= insert depends)
     (= (:left-parent depends) (:copy insert))))
 
-(defmethod insert-change-dependent? CListInsert [graph insert listinsert]
-  (and
-    (insert-change-dependent-default? graph insert listinsert)
-    (not (insert-change-already-linked? graph insert listinsert))))
+;(defmethod insert-change-dependent? CListInsert [graph insert listinsert]
+;	 (and
+;	   (insert-change-dependent-default? graph insert listinsert)
+;	   (not (insert-change-already-linked? graph insert listinsert))))
+	
+;(defmethod insert-change-dependent? CListMove [graph insert listmove]
+;	 (and  
+;	   (insert-change-dependent-default? graph insert listmove)
+;	   (not (insert-change-already-linked? graph insert listmove))))
 
-(defmethod insert-change-dependent? CListMove [graph insert listmove]
-  (and  
-    (insert-change-dependent-default? graph insert listmove)
-    (not (insert-change-already-linked? graph insert listmove))))
+(defmethod insert-change-dependent? CListInsert [graph insert listdelete]
+  false)
+
+(defmethod insert-change-dependent? CListMove [graph insert listdelete]
+  false)
+
 
 (defmethod insert-change-dependent? CListDelete [graph insert listdelete]
   false)
@@ -325,7 +324,9 @@
         (fn [graph pc]
           (let [parent (first pc)
                 child (second pc)]
-            (change-add-child (change-add-list-dependency graph child parent) parent child)))
+            (-> graph
+              (change-add-list-dependency parent child)
+              (change-add-child parent child))))
         graph
         parent-child)))
   (let [changes (:changes graph)
@@ -333,7 +334,7 @@
         grouped (group-by :left-parent listchanges)]
     (reduce
       (fn [graph group]
-        (link-group graph group))
+        (link-group graph (sort-by :index group)))
       graph
       (mapcat #(vals (group-by :property %)) (vals grouped)))))
 
@@ -390,23 +391,29 @@
       graph
       (mapcat #(vals (group-by :property %)) (vals grouped)))))
 
-
-
 (defn- link-group-roots [graph]
   (defn find-and-set-root [graph operation roots]
-    (let [root (some #(= (:copy %) (:left-parent operation)) roots)]
+    (let [nodes (filter #(insert-change-dependent-default? graph operation %) roots)
+          root (first (sort-by :index nodes))]
       (if-not (nil? root)
         (change-add-dependency graph operation root)
         graph)))
   (let [changes (:changes graph)
-        possible-roots (remove list-operation? (filter insert? changes))
+        possible-roots (filter insert? changes)
         ;;deletes should never be inside an insert as the node shouldnt get inserted in the first place
-        list-roots (remove delete? (filter #(nil? (change-dependency graph %)) (filter list-operation? changes)))] 
-    (reduce
-      (fn [g change]
-        (find-and-set-root g change possible-roots))
-      graph
-      list-roots)))
+        possible-first (remove delete? (filter #(nil? (change-dependency graph %)) (filter list-operation? changes)))
+        ;;group them by property and set the root of every property list
+        property-possible-first (group-by :property possible-first)]
+      (reduce
+        (fn [g group]
+          (reduce
+            (fn [g insert]
+              (find-and-set-root g insert group))
+            g
+            possible-roots))
+        graph
+        (vals property-possible-first))))
+ 
 
 (defn- add-roots-to-graph [graph]
   (let [dependency (:dependency graph)
@@ -753,10 +760,3 @@
          (logic/project [?matching]
            (logic/project [?left]
              (logic/== ?right (get ?matching ?left))))]))))
-
-
-;;
-
-
-
-      

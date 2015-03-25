@@ -7,12 +7,32 @@
   (:require [damp.ekeko.logic :as el])
   (:require [damp.ekeko.jdt.astnode :as astnode])
   (:require [qwalkeko.clj.ast :as ast])
-  (:require [qwalkeko.clj.changes :as change])
   (:require [damp.qwal :as qwal])
   (:require [damp.ekeko.jdt
              [ast :as jdt]]))
 
-;;Converting Java Changes to Clojure Changes (classes prefixed with a C)
+;;;; This file converts Java Changes provided by ChangeNodes into a more structured representation.
+;;;; This representation structures changes as a tree (even though it's called a graph everywhere)
+;;;;  in which dependent changes are connected.
+;;;; A dependency between changes can exist because 
+;;;;  - a change is a child of another change (eg: Insert method and Insert expression in body of that method)
+;;;;  - two changes modify the same ChildListProperty (eg: insert two expressions in a body at certain index i and j)
+;;;; The latter changes can be applied independently from eachother, but indexes of 'later' changes must be changed
+;;;;  if earlier changes have not been applied yet.
+
+;;;; The algorithm works in different steps. First of all dependencies of the first kind are detected.
+;;;; Second we link together changes that apply on the same list.
+;;;; Finally we link together the head of that list with the corresponding change
+
+;;;; The implementation is completely functional, and every operation returns a new graph object.
+;;;; Changes are represented internally as numbers (accessed via :graph-idx). This also means that
+;;;; indexes should always be converted to a concrete change against the current graph as old concrete changes
+;;;; may no longer be correct. Indexes remain unique throughout the lifetime of the graph.
+
+;;;; Most changes have a :original, :copy, :left-parent and :right-parent
+;;;; :original 
+
+;;Clojure Representation of a Change
 (defrecord CDelete  [operation original copy property index graph-idx]
   clojure.core.logic.protocols/IUninitialized
   (-uninitialized [_] (CDelete. :delete nil nil nil nil nil)))

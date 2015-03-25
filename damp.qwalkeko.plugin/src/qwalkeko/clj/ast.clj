@@ -19,11 +19,10 @@
         (f node)
         nil))))
 
-
-(defn has-clj-unwrap [keyword node]
+(defn has-clj-unwrapped [keyword node]
   (let [res (has-clj keyword node)]
-    (if (map? res)
-      (:value res)
+    (if (astnode/value? res)
+      (astnode/value-unwrapped res)
       res)))
 
 ;;astmatching
@@ -282,11 +281,11 @@
       false
       (every? (fn [[a b]] 
                (= 
-                 (:value (->> a
-                           (has-clj :type)
-                           (has-clj :name)
-                           (has-clj :identifier)))
-                 (:value (->> b
+                 (astnode/value-unwrapped (->> a
+                                   (has-clj :type)
+                                   (has-clj :name)
+                                   (has-clj :identifier)))
+                 (astnode/value-unwrapped (->> b
                            (has-clj :type)
                            (has-clj :name)
                            (has-clj :identifier)))))
@@ -302,4 +301,4 @@
   (jdt/has :parameters ?methodA ?signatureA)
   (jdt/has :parameters ?methodB ?signatureB)
   (logic/project [?signatureA ?signatureB]
-    (signaturelist-signaturelist|same (seq (:value ?signatureA)) (seq (:value ?signatureB))))))
+    (signaturelist-signaturelist|same (seq (astnode/value-unwrapped ?signatureA)) (seq (astnode/value-unwrapped ?signatureB))))))

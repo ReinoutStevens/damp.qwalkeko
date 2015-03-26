@@ -5,7 +5,6 @@
   (:require [clojure.core.logic :as logic])
   (:require [damp.ekeko.jdt.astnode :as astnode])
   (:require [damp.ekeko.logic :as el])
-  (:require [damp.ekeko.jdt.astnode :as astnode])
   (:require [qwalkeko.clj.ast :as ast])
   (:require [damp.qwal :as qwal])
   (:require [damp.ekeko.jdt
@@ -187,31 +186,30 @@
      :child (vec (take size (repeat nil)))
      :differencer (:differencer changes)}))
 
-(defn graph-node-idx [graph idx]
+(defn graph-change-idx [graph idx]
+  "Retrieves correspending change"
   (when-not (nil? idx)
     (nth (:changes graph) idx)))
-  
-
+ 
 (defn change-dependents-idx [graph change]
   (nth (:dependents graph) (:graph-idx change)))
 
 (defn change-dependents [graph change]
-  (map #(graph-node-idx graph %)
+  (map #(graph-change-idx graph %)
     (change-dependents-idx graph change)))
                          
 (defn change-dependency-idx [graph change]
   (nth (:dependency graph) (:graph-idx change)))
 
 (defn change-dependency [graph change]
- (graph-node-idx graph
+ (graph-change-idx graph
    (change-dependency-idx graph change)))
-
 
 (defn change-child-idx [graph change]
   (nth (:child graph) (:graph-idx change)))
 
 (defn change-child [graph change]
-  (graph-node-idx graph 
+  (graph-change-idx graph 
     (change-child-idx graph change)))
     
 (defn change-add-dependency [graph change dependent]
@@ -285,7 +283,7 @@
 
     
 (defmulti insert-change-dependent? 
-  "dependent depdends on insert. Only used during the creation of the dependency graph." 
+  "Change depends on insert. Only used during the creation of the dependency graph." 
   (fn [graph insert dependent] (class dependent)))
 
 (defmethod insert-change-dependent? :default [graph insert change] 
@@ -299,21 +297,11 @@
     (not= insert depends)
     (= (:left-parent depends) (:copy insert))))
 
-;(defmethod insert-change-dependent? CListInsert [graph insert listinsert]
-;	 (and
-;	   (insert-change-dependent-default? graph insert listinsert)
-;	   (not (insert-change-already-linked? graph insert listinsert))))
-	
-;(defmethod insert-change-dependent? CListMove [graph insert listmove]
-;	 (and  
-;	   (insert-change-dependent-default? graph insert listmove)
-;	   (not (insert-change-already-linked? graph insert listmove))))
-
 (defmethod insert-change-dependent? CListInsert [graph insert listdelete]
-  false)
+  false) ;;done later
 
 (defmethod insert-change-dependent? CListMove [graph insert listdelete]
-  false)
+  false) ;;done later
 
 
 (defmethod insert-change-dependent? CListDelete [graph insert listdelete]
@@ -412,6 +400,7 @@
       (mapcat #(vals (group-by :property %)) (vals grouped)))))
 
 (defn- link-group-roots [graph]
+  "Links the head of a list to the parent of all the elements in the list."
   (defn find-and-set-root [graph operation roots]
     (let [nodes (filter #(insert-change-dependent-default? graph operation %) roots)
           root (first (sort-by :index nodes))]
@@ -457,67 +446,15 @@
 
 ;;Graph helpers
 (defn change-graph-roots [graph]
-  (map #(graph-node-idx graph %) (:roots graph)))
+  (map #(graph-change-idx graph %) (:roots graph)))
 
 (defn change-graph-dependencies-idx [graph]
   (remove #(nil? (nth (:dependency graph) %)) (range (count (:changes graph)))))
 
 (defn change-graph-dependencies [graph]
-  (map #(graph-node-idx graph %) (change-graph-dependencies-idx graph)))
+  (map #(graph-change-idx graph %) (change-graph-dependencies-idx graph)))
 
-;;qwal integration to navigate changes a bit better
-(defn change-root [?root graph]
-  (logic/project [graph]
-    (damp.ekeko.logic/contains (change-graph-roots graph) ?root)))
-
-(defn change [?change graph]
-  (logic/project [graph]
-    (damp.ekeko.logic/contains (:changes graph) ?change)))
-
-(defn change=>> []
-  (fn [graph change ?dependent]
-    (logic/fresh [?prop]
-      (logic/project [change]
-        (logic/fresh [?map]
-          (logic/== false (update? change))
-          (logic/== ?map (change-dependents graph change))
-          (logic/project [?map]
-            (damp.ekeko.logic/contains (seq (keys @?map)) ?prop)
-            (logic/project [?prop]
-              (logic/== ?dependent (?prop (change-dependents graph change))))))))))
-
-(defn change=> [?prop]
-  (fn [graph change ?dependent]
-    (logic/project [change]
-      (logic/fresh [?map]
-        (logic/== false (update? change))
-        (logic/== ?map (change-dependents graph change))
-        (logic/project [?map]
-	          (damp.ekeko.logic/contains (seq (keys @?map)) ?prop)
-           (logic/project [?prop]
-             (logic/== ?dependent (?prop (change-dependents graph change)))))))))
-
-(defn change<= []
-  (fn [graph change ?dependency]
-    (logic/project [change]
-      (logic/fresh [?map]
-        (logic/== ?map (change-dependency graph change))
-        (logic/project [?map]
-          (logic/== ?dependency @?map)
-          (logic/!= nil ?dependency))))))
-
-(defn change=c> []
-  (fn [graph listchange ?dependent]
-    (logic/project [listchange]
-      (logic/== true (list-operation? listchange))
-      (logic/== ?dependent (change-child graph listchange)))))
-     
-(defn change=c< [] 
-  (fn [graph listchange ?dependency]
-    (logic/project [listchange]
-      (logic/== true (list-operation? listchange))
-      (logic/== ?dependency (change-dependency graph listchange)))))
-    
+   
 ;;Operations that work on changes that are already in a graph
 (defn list-operation-parent-operation [graph x]
   (when (list-operation? x)

@@ -163,8 +163,6 @@ public class MetaVersion {
 				doCheckoutOperation();
 				//eclipse does silly things when a .git is present, especially when you delete that folder later
 				deleteGitFolder();
-				//build project
-				metaProject.getBuilder().build(eclipseProject);
 			} 
 		} catch(Exception e){
 			IStatus status = new Status(Status.ERROR, Activator.PLUGIN_ID, e.getMessage(), e);
@@ -238,6 +236,7 @@ public class MetaVersion {
 			if(!eclipseProject.isOpen()){
 				eclipseProject.open(null);
 			}
+			metaProject.getBuilder().build(eclipseProject);
 			//always add ekeko nature last as the model starts building once the nature is added
 			//some natures modify how ekeko builds its model
 			String[] natures = new String[]{ QwalkekoNature.NATURE_ID, EkekoNature.NATURE_ID };

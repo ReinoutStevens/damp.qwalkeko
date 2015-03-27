@@ -61,6 +61,10 @@ public class HistoryProjectModel extends ProjectModel {
 						"something went wrong parsing the file");
 				throw new CoreException(status);
 			}
+			ProjectBuilder builder = buildProjectBuilder();
+			for(MetaProject p : metaProduct.getMetaProjects()){
+				p.setBuilder(builder);
+			}
 		} catch (IOException e) {
 			IStatus status = new Status(Status.ERROR, "ScrapperPlugin",
 					"something went wrong parsing the file", e);
@@ -72,7 +76,7 @@ public class HistoryProjectModel extends ProjectModel {
 		}
 	}
 
-	private void buildProjectBuilder() throws CoreException{
+	private ProjectBuilder buildProjectBuilder() throws CoreException{
 		IFile ifile = getProject().getFile(ProjectBuilder.xmlName);
 		File file = new File(ifile.getLocationURI());
 		ProjectBuilder builder = null;
@@ -96,6 +100,6 @@ public class HistoryProjectModel extends ProjectModel {
 			builder = new ProjectBuilder();
 		}
 		assert(builder != null);
-		
+		return builder;
 	}
 }

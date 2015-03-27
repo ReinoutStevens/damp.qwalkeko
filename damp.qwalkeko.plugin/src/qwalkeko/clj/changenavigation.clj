@@ -191,7 +191,7 @@
   ;;change is the next change that needs to be applied
   ;;we will apply it and all of its dependent changes
   (let [dependents (vals (nth (:dependents graph) change))
-        new-graph (change-apply graph (changes/graph-node-idx graph change))]
+        new-graph (change-apply graph (changes/graph-change-idx graph change))]
     (if (empty? dependents)
       new-graph
       (reduce (fn [g idx]
@@ -205,7 +205,7 @@
     (logic/!= ?changes nil)
     (el/contains ?changes ?change-idx)
     (logic/project [?change-idx]
-      (logic/== ?change (changes/graph-node-idx current ?change-idx))
+      (logic/== ?change (changes/graph-change-idx current ?change-idx))
       (logic/project [?change]
         (logic/== ?next (change-apply current ?change))))))
 

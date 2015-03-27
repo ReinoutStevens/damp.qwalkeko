@@ -73,7 +73,7 @@
 (defn- get-node-idx [node property idx]
   (if (nil? idx)
     (ast/has-clj property node)
-    (nth (seq (ast/has-clj-unwrap property node)) idx)))
+    (nth (seq (ast/has-clj-unwrapped property node)) idx)))
 
 (defmulti convert-operation class)
 
@@ -123,7 +123,7 @@
 (defmethod convert-operation Update [operation]
   (let [prop (convert-property (.getProperty operation))
         m {:operation :update
-           :original (ast/has-clj-unwrap prop (.getOriginal operation))
+           :original (ast/has-clj-unwrapped prop (.getOriginal operation))
            :copy (ast/has-clj prop (.getLeftParent operation))
            :left-parent (.getLeftParent operation)
            :right-parent (.getRightParent operation)

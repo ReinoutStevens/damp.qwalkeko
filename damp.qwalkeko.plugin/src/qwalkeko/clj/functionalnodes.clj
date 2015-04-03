@@ -231,8 +231,6 @@
 (defn change-add-list-dependency [graph change dependent]
   (let [idx (:graph-idx change)
         property (:property dependent)
-        dependents (:dependents graph)
-        dependent-map (nth dependents idx)
         copy (:copy change)
         new-dependency (assoc (:dependency graph) (:graph-idx dependent) idx)]
     (assoc graph 
@@ -272,19 +270,41 @@
        :dependency new-dependency)))
 
 ;;Methods used to set up the graph
-(defn insert-change-dependent-default? [graph insert change]
-   (let [left-parent (:left-parent change)
-        location (.getLocationInParent left-parent)
-        mandatory (and (not (.isChildListProperty location))(.isMandatory location))]
+(defmulti move-change-dependent? (fn [graph move change] (class change)))
+(defmulti insert-change-dependent? (fn [graph insert change] (class change)))
+(defmulti change-change-dependent?
+   "Dependent depends on change. Only used during the creation of the dependency graph." 
+   (fn [graph change dependent] (class change)))
+
+(defn change-change-dependent-default? [graph change dep]
+   (let [left-parent (:left-parent dep)
+         location (.getLocationInParent left-parent)   
+         mandatory (and (not (nil? location)) (not (.isChildListProperty location))(.isMandatory location))]
     (or
-      (= (:left-parent change) (:copy insert))
-      (and mandatory (= (:copy insert)
+      (= (:left-parent dep) (:copy change))
+      (and mandatory (= (:copy change)
                        (.getParent left-parent))))))
 
-    
-(defmulti insert-change-dependent? 
-  "Change depends on insert. Only used during the creation of the dependency graph." 
-  (fn [graph insert dependent] (class dependent)))
+(defn insert-change-dependent-default? [graph insert change]
+   (change-change-dependent-default? graph insert change))
+
+(defn move-change-dependent-default? [graph move change]
+  (change-change-dependent-default? graph move change))
+
+(defmethod change-change-dependent? :default [graph change dep]
+  false)
+
+(defmethod change-change-dependent? CInsert [graph insert dep]
+  (insert-change-dependent? graph insert dep))
+
+(defmethod change-change-dependent? CListInsert [graph insert dep]
+  (insert-change-dependent? graph insert dep))
+
+(defmethod change-change-dependent? CMove [graph move dep]
+  (move-change-dependent? graph move dep))
+
+(defmethod change-change-dependent? CListMove [graph move dep]
+  (move-change-dependent? graph move dep))
 
 (defmethod insert-change-dependent? :default [graph insert change] 
   (insert-change-dependent-default? graph insert change))
@@ -303,25 +323,49 @@
 (defmethod insert-change-dependent? CListMove [graph insert listdelete]
   false) ;;done later
 
-
 (defmethod insert-change-dependent? CListDelete [graph insert listdelete]
   false)
 
-(defn- insert-link-direct-dependents [graph]
-  "links ChildProperty to an insert"
-  (let [changes (:changes graph)
-        inserts (filter insert? changes)]
+;;clone of insert dependent...
+(defmethod move-change-dependent? :default [graph move change]
+  (move-change-dependent-default? graph move change))
+
+(defmethod move-change-dependent? CDelete [graph move delete]
+ false) ;;is done later
+
+
+(defmethod move-change-dependent? CMove [graph move depends]
+  (and 
+    (not= move depends)
+    (= (:left-parent depends) (:copy move))))
+
+(defmethod move-change-dependent? CInsert [graph move depends]
+  (= (:left-parent depends) (:copy move)))
+
+(defmethod move-change-dependent? CListInsert [graph move listdelete]
+  false) ;;done later
+
+(defmethod move-change-dependent? CListMove [graph move listdelete]
+  false) ;;done later
+
+(defmethod move-change-dependent? CListDelete [graph move listdelete]
+  false)
+
+
+(defn- change-link-direct-dependents [graph]
+  "links directly dependent changes (only ChildProperty)"
+  (let [changes (:changes graph)]
     (reduce
-      (fn [graph i]
+      (fn [graph c]
         (reduce
-          (fn [graph c]
-            (if (insert-change-dependent? graph i c)
-              (change-add-dependency graph i c)
+          (fn [graph dep]
+            (if (and (not= dep c) (change-change-dependent? graph c dep))
+              (change-add-dependency graph c dep)
               graph))
           graph
           changes))
       graph
-      inserts)))
+      changes)))
 
 (defn- link-list-dependents [graph]
   "links operations in the same ChildListProperty in a linked list (without deletes)"
@@ -402,13 +446,13 @@
 (defn- link-group-roots [graph]
   "Links the head of a list to the parent of all the elements in the list."
   (defn find-and-set-root [graph operation roots]
-    (let [nodes (filter #(insert-change-dependent-default? graph operation %) roots)
+    (let [nodes (filter #(change-change-dependent-default? graph operation %) roots)
           root (first (sort-by :index nodes))]
       (if-not (nil? root)
         (change-add-dependency graph operation root)
         graph)))
   (let [changes (:changes graph)
-        possible-roots (filter insert? changes)
+        possible-roots (filter #(or (insert? %) (move? %)) changes)
         ;;deletes should never be inside an insert as the node shouldnt get inserted in the first place
         possible-first (remove delete? (filter #(nil? (change-dependency graph %)) (filter list-operation? changes)))
         ;;group them by property and set the root of every property list
@@ -416,8 +460,8 @@
       (reduce
         (fn [g group]
           (reduce
-            (fn [g insert]
-              (find-and-set-root g insert group))
+            (fn [g op]
+              (find-and-set-root g op group))
             g
             possible-roots))
         graph
@@ -434,7 +478,7 @@
   (let [graph (changes->graph changes)]
     (->
       graph
-      insert-link-direct-dependents
+      change-link-direct-dependents
       link-list-dependents
       link-delete-dependents
       link-group-roots

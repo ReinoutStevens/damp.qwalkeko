@@ -134,6 +134,41 @@
     (java-change-apply new-graph new-update (:graph-idx change))))
 
 
+(defmulti graph-change-convert-to-ast (fn [graph change ast] (class change)))
+
+(defmethod graph-change-convert-to-ast :default [graph change ast]
+  nil)
+(defmethod graph-change-convert-to-ast qwalkeko.clj.functionalnodes.CDelete [graph change ast]
+  (update-in change [:copy] #(graph-corresponding-node graph ast %)))
+
+(defmethod graph-change-convert-to-ast qwalkeko.clj.functionalnodes.CMove [graph change ast]
+  (-> change
+    (update-in [:copy] #(graph-corresponding-node graph ast %))
+    (update-in [:left-parent] #(graph-corresponding-node graph ast %))))
+
+(defmethod graph-change-convert-to-ast qwalkeko.clj.functionalnodes.CUpdate [graph change ast]
+  (-> change
+    (update-in [:left-parent] #(graph-corresponding-node graph ast %))))
+
+(defmethod graph-change-convert-to-ast qwalkeko.clj.functionalnodes.CInsert [graph change ast]
+  (-> change
+    (update-in [:copy] #(graph-corresponding-node graph ast %))
+    (update-in [:left-parent] #(graph-corresponding-node graph ast %))))
+
+(defmethod graph-change-convert-to-ast qwalkeko.clj.functionalnodes.CListDelete [graph change ast]
+  (update-in change [:copy] #(graph-corresponding-node graph ast %)))
+
+(defmethod graph-change-convert-to-ast qwalkeko.clj.functionalnodes.CListMove [graph change ast]
+  (-> change
+    (update-in [:copy] #(graph-corresponding-node graph ast %))
+    (update-in [:left-parent] #(graph-corresponding-node graph ast %))))
+
+(defmethod graph-change-convert-to-ast qwalkeko.clj.functionalnodes.CListInsert [graph change ast]
+  (-> change
+    (update-in [:copy] #(graph-corresponding-node graph ast %))
+    (update-in [:left-parent] #(graph-corresponding-node graph ast %))))
+
+
 (defrecord NavigatableChangeGraph 
   [left right differencer changes roots dependents dependency child ast-map asts applied current]
   clojure.core.logic.protocols/IUninitialized
@@ -209,6 +244,18 @@
       (logic/project [?change]
         (logic/== ?next (change-apply current ?change))))))
 
+(defn change->* [_ current ?next]
+  (logic/conde
+    [(logic/== current ?next)]
+    [(logic/fresh [?neext]
+       (change-> _ current ?neext)
+       (change->* _ ?neext ?next))]))
+
+(defn change->+ [_ current ?next]
+  (logic/fresh [?neext]
+    (change-> _ current ?neext)
+    (change->* _ ?neext ?next)))
+
 (defn change!> [_ current ?next]
   (logic/fresh [?changes ?change-idx]
     (logic/== ?changes (graph-next-changes current))
@@ -217,13 +264,32 @@
     (logic/project [?change-idx]
       (logic/== ?next (graph-hop-over-change current ?change-idx)))))
 
+(defn change!>* [_ current ?next]
+  (logic/conde
+    [(logic/== current ?next)]
+    [(logic/fresh [?neext]
+       (change!> _ current ?neext)
+       (change!>* _ ?neext ?next))]))
 
-(defmacro in-current-change-state [[current ast] & goals]
+(defn graph-node-node-ast-corresponding [graph original ?node ast]
+  (logic/project [graph original ast]
+    (logic/== ?node (graph-change-convert-to-ast graph original ast))
+    (logic/!= ?node nil)))
+
+(defmacro with-last-change [[current ast change] & goals]
   `(fn [graph# ~current next#]
-     (logic/fresh [~ast]
+     (logic/fresh [~ast ~change]
        (logic/== ~ast (first (:asts ~current)))
+       (logic/== ~change 
+         (graph-change-convert-to-ast ~current
+           (.getAST (first (:asts ~current))) 
+           (changes/graph-change-idx ~current (:current ~current))))
        ~@goals
        (logic/== next# ~current))))
+
+(defmacro in-current-change-state [[current ast] & goals]
+  `(with-last-change [~current ~ast change# ] 
+     ~@goals))
 
 (defmacro step-changes [navigatable ?end [& bindings ] & goals]
   `(logic/fresh [graph#]

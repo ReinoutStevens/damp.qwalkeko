@@ -14,10 +14,10 @@
 
 
 ;;applying changes
-(defn link-sequences [left-seq copy-seq]
+(defn- link-sequences [left-seq copy-seq]
   (apply assoc {} (interleave left-seq copy-seq)))
 
-(defn link-asts [left right]
+(defn- link-asts [left right]
   (let [left-iter (new DepthFirstNodeIterator left)
         right-iter (new DepthFirstNodeIterator right)
         left-seq (iterator-seq left-iter)
@@ -168,22 +168,36 @@
     (update-in [:copy] #(graph-corresponding-node graph ast %))
     (update-in [:left-parent] #(graph-corresponding-node graph ast %))))
 
-
+;;Navigatable Graph
 (defrecord NavigatableChangeGraph 
   [left right differencer changes roots dependents dependency child ast-map asts applied current]
   clojure.core.logic.protocols/IUninitialized
   (-uninitialized [_] (NavigatableChangeGraph. nil nil nil nil nil nil nil nil nil nil nil nil)))
 
 (defmethod print-method NavigatableChangeGraph [graph ^java.io.Writer w]
-  (print-method (dissoc graph :ast-map :asts) w))
-
+  (print-method (dissoc graph :ast-map :asts :changes) w))
 
 (defn graph-to-navigatable-graph [graph left right]
   (let [diff (:differencer graph)
         copy-original (into {} (.getCopyToOriginal diff))
-        ast-map {(.getAST left)  copy-original}]
+        ast-map {(.getAST left)  copy-original}
+        dependents (reduce 
+                     (fn [res i] 
+                       (let [deps (nth (:dependencies graph) i)]
+                         (reduce
+                           (fn [res d]
+                             (update-in res [d]
+                               conj i))
+                           res deps)))                       
+                     (vec (repeat (changes/graph-order graph) #{}))
+                     (range (changes/graph-order graph)))]
     (map->NavigatableChangeGraph 
-      (assoc graph :ast-map ast-map :asts (list left) :left left :right right
+      (assoc graph 
+        :dependencies (map seq (:dependencies graph)) ;;core.logic does not like sets
+        :ast-map ast-map 
+        :asts (list left) 
+        :dependents (map seq dependents) ;;core.logic still does not like sets
+        :left left :right right
         :applied (vec (repeat (count (:changes graph)) false))
         :current nil))))
         
@@ -192,6 +206,7 @@
   (let [changes (changes/ast-ast-graph left right)
         navigatable (graph-to-navigatable-graph changes left right)]
     navigatable))
+
 
 ;;Qwal that shit
 (defn graph-change-applied? [graph idx]
@@ -202,37 +217,15 @@
         unapplied (remove #(graph-change-applied? graph %) roots)]
     unapplied))
 
-(defn vals* [m]
-  (defn vals-recur [a m]
-    (if (map? m)
-      (reduce into a (map (fn [v] (vals-recur a v)) (vals m)))
-      (conj a m)))
-  (vals-recur '() m))
-
-
 (defn graph-next-changes [graph]
-  (let [curr (:current graph)]
-    (if (nil? curr)
-      (graph-next-roots graph)
-      (let [next (nth (:dependents graph) curr)]
-        (if-not (empty? next)
-          (vals* next)
-          (let [nextchild (nth (:child graph) curr)]
-            (if nextchild
-              (list nextchild)
-              (graph-next-roots graph))))))))
-
-(defn graph-hop-over-change [graph change]
-  ;;change is the next change that needs to be applied
-  ;;we will apply it and all of its dependent changes
-  (let [dependents (vals (nth (:dependents graph) change))
-        new-graph (change-apply graph (changes/graph-change-idx graph change))]
-    (if (empty? dependents)
-      new-graph
-      (reduce (fn [g idx]
-                (graph-hop-over-change g idx))
-        new-graph
-        dependents))))
+  (let [unapplied (remove #(graph-change-applied? graph %) (range (changes/graph-order graph)))]
+    (filter
+      (fn [i]
+        (every?
+          (fn [c]
+            (graph-change-applied? graph c))
+          (nth (:dependencies graph) i)))
+      unapplied)))
 
 (defn change-> [_ current ?next]
   (logic/fresh [?changes ?change-idx ?change]
@@ -256,20 +249,6 @@
     (change-> _ current ?neext)
     (change->* _ ?neext ?next)))
 
-(defn change!> [_ current ?next]
-  (logic/fresh [?changes ?change-idx]
-    (logic/== ?changes (graph-next-changes current))
-    (logic/!= ?changes nil)
-    (el/contains ?changes ?change-idx)
-    (logic/project [?change-idx]
-      (logic/== ?next (graph-hop-over-change current ?change-idx)))))
-
-(defn change!>* [_ current ?next]
-  (logic/conde
-    [(logic/== current ?next)]
-    [(logic/fresh [?neext]
-       (change!> _ current ?neext)
-       (change!>* _ ?neext ?next))]))
 
 (defn graph-node-node-ast-corresponding [graph original ?node ast]
   (logic/project [graph original ast]

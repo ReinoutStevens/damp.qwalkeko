@@ -122,13 +122,13 @@
 
 (defn compilationunit-compilationunit|corresponding [?left ?right]
   "finds the corresponding compilationunit of the given cu in the current version"
-  (logic/fresh [?root ?path ?leftname ?leftpackage ?leftpname ?leftmain 
+  (logic/fresh [?path ?leftname ?leftpackage ?leftpname ?leftmain 
                 ?rightname ?rightmain ?rightpackage ?rightpname]
     (logic/all
       (jdt/ast :CompilationUnit ?left)
       (jdt/has :package ?left ?leftpackage)
       (jdt/has :name ?leftpackage ?leftpname)
-      (compilationunit-typedeclaration|main ?root ?leftmain)
+      (compilationunit-typedeclaration|main ?left ?leftmain)
       (jdt/has :name ?leftmain ?leftname)
       (jdt/ast :CompilationUnit ?right)
       (jdt/has :package ?right ?rightpackage)

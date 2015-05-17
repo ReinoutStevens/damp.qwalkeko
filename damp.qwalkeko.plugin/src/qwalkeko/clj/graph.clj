@@ -27,8 +27,6 @@
 (defn successors! [metaversion successors]
   (reset! (:successors metaversion) (set successors)))
 
-
-
 (defn convert-to-graph [versions]
   (let [converted (zipmap versions (map #(metaversion %) versions))]
     (doall

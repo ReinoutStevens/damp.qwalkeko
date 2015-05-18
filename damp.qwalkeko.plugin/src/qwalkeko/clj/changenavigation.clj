@@ -46,6 +46,29 @@
   (let [ast (.getAST (first (:asts graph)))]
     (graph-corresponding-node graph ast node)))
 
+;;independent indexes
+(defmulti graph-change-current-index (fn [graph change idx] (class change)))
+
+(defmethod graph-change-current-index :default [graph change idx]
+  idx)
+
+(defmethod graph-change-current-index qwalkeko.clj.functionalnodes.CListInsert [graph change idx]
+  (let [parent (changes/graph-change-parent graph change)
+        new-idx (if (nth (:applied graph) (:graph-idx change)) idx (- idx 1))]
+    (graph-change-current-index graph parent new-idx)))
+
+(defmethod graph-change-current-index qwalkeko.clj.functionalnodes.CListMove [graph change idx]
+  (let [parent (changes/graph-change-parent graph change)
+        new-idx (if (nth (:applied graph) (:graph-idx change)) idx (- idx 1))]
+    (graph-change-current-index graph parent new-idx)))
+
+
+(defmethod graph-change-current-index qwalkeko.clj.functionalnodes.CListDelete [graph change idx]
+  (let [parent (changes/graph-change-parent graph change)
+        new-idx (if (nth (:applied graph) (:graph-idx change)) idx (+ idx 1))]
+    (graph-change-current-index graph parent new-idx)))
+
+
 (defn java-change-apply [graph jchange idx]
   (let [new-ast (first (:asts graph))
         ast-map (get (:ast-map graph) (.getAST new-ast))
@@ -76,7 +99,7 @@
         lparent (:left-parent change)
         lnode (:copy change)
         mlparent (graph-corresponding-node-latest-ast new-graph lparent)
-        index (:index change)
+        index (graph-change-current-index (changes/graph-change-parent graph change) (:index change))
         new-insert (new Insert nil mlparent lparent 
                      lnode
                      (astnode/node-property-descriptor-for-ekeko-keyword lparent prop)
@@ -102,9 +125,10 @@
         lnode (:copy change)
         mnode (graph-corresponding-node-latest-ast new-graph lnode)
         mlparent (graph-corresponding-node-latest-ast new-graph lparent)
+        index  (graph-change-current-index (changes/graph-change-parent graph change) (:index change))
         new-move (new Move nil mnode mlparent lparent 
                    (astnode/node-property-descriptor-for-ekeko-keyword lparent prop)
-                   (:index change))]
+                   index)]
     (java-change-apply new-graph new-move (:graph-idx change))))
 
 

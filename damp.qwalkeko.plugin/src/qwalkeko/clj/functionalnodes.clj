@@ -184,6 +184,7 @@
     {:changes (vec (map-indexed (fn [idx c] (assoc c :graph-idx idx)) (:changes changes)))
      :dependencies (vec (take size (repeat (sorted-set))))
      :child (vec (take size (repeat nil)))
+     :parent (vec (take size (repeat nil)))
      :differencer (:differencer changes)}))
 
 (defn graph-change-idx [graph idx]
@@ -215,14 +216,22 @@
     (assoc graph 
       :dependencies new-dependencies)))
 
-(defn change-add-list-dependency [graph change dependent]
-  (change-add-dependency graph change dependent))
+(defn change-add-parent-dependency [graph change parent]
+  (let [parents (:parent graph)]
+    (assoc graph
+      :parent
+      (assoc parents (:graph-idx change) (:graph-idx parent)))))
      
-(defn change-add-child [graph change child]
+(defn change-add-child-dependency [graph change child]
   (let [children (:child graph)]
     (assoc graph
       :child
       (assoc children (:graph-idx change) (:graph-idx child)))))
+
+(defn change-add-list-dependency [graph change parent]
+  (-> graph
+    (change-add-parent-dependency change parent)
+    (change-add-child-dependency parent change)))
 
 ;;Methods used to set up the graph
 (defmulti move-change-dependent? (fn [graph move change] (class change)))
@@ -251,9 +260,6 @@
 (defn insert-change-dependent-default? [graph insert change]
    (change-change-dependent-default? graph insert change))
 
-(defn move-change-dependent-default? [graph move change]
-  (change-change-dependent-default? graph move change))
-
 (defmethod change-change-dependent? :default [graph change dep]
   false)
 
@@ -273,7 +279,7 @@
   (insert-change-dependent-default? graph insert change))
 
 (defmethod insert-change-dependent? CDelete [graph insert delete]
- false) ;;is done later
+  false)
 
 (defmethod insert-change-dependent? CInsert [graph insert depends]
   (and 
@@ -281,54 +287,59 @@
     (change-change-dependent-default? graph insert depends)))
 
 (defmethod insert-change-dependent? CMove [graph insert move]
-   (insert-change-dependent-default? graph insert move))
+  (insert-change-dependent-default? graph insert move))
 
 (defmethod insert-change-dependent? CListInsert [graph insert listinsert]
-  false) ;;done later
+  (insert-change-dependent-default? graph insert listinsert))
 
 (defmethod insert-change-dependent? CListMove [graph insert listmove]
-  false) ;;done later
+  (insert-change-dependent-default? graph insert listmove))
 
 (defmethod insert-change-dependent? CListDelete [graph insert listdelete]
   false)
 
-;;clone of insert dependent...
+;;Moves
+(defn move-change-dependent-default? [graph move change]
+  (change-change-dependent-default? graph move change))
+
 (defmethod move-change-dependent? :default [graph move change]
   (move-change-dependent-default? graph move change))
 
+;;deleting a node we later need is not recommended
 (defmethod move-change-dependent? CDelete [graph move delete]
  (let [parents (take-while #(not (nil? %)) (iterate #(.getParent %) (:original move)))]
    (some #(= % (:original delete)) parents)))
-       
+
 (defmethod move-change-dependent? CMove [graph move depends]
   (and 
     (not= move depends)
     (move-change-dependent-default? graph move depends)))
 
+;;an insert can overwrite part of the AST that still needs to be used by a move
+;;if that insert operates somewhere above the move
 (defmethod move-change-dependent? CInsert [graph move insert]
  (let [insert-parent (when-let [original (:original insert)] (.getParent original))
         parents (take-while #(not (nil? %))
                   (iterate #(.getParent %) (:original move)))]
     (or
-      (= (:left-parent insert) (:copy move))
+      (move-change-dependent-default? graph move insert)
       (and 
         insert-parent
         (not (instance? CListMove move))
         (some #(= insert-parent %) parents)))))
 
-(defmethod move-change-dependent? CListInsert [graph move listdelete]
-  false)
+(defmethod move-change-dependent? CListInsert [graph move insert]
+  (move-change-dependent-default? graph move insert))
 
-(defmethod move-change-dependent? CListMove [graph move listdelete]
-  false) ;;done later
+(defmethod move-change-dependent? CListMove [graph move listmove]
+    (move-change-dependent-default? graph move listmove))
 
 (defmethod move-change-dependent? CListDelete [graph move listdelete]
    (let [parents (take-while #(not (nil? %)) (iterate #(.getParent %) (:original move)))]
      (some #(= % (:original listdelete)) parents)))
 
-
 (defn- change-link-direct-dependents [graph]
-  "links directly dependent changes (only ChildProperty)"
+  "Links changes that directly depend on each other by comparing two changes pairwise"
   (let [changes (:changes graph)]
     (reduce
       (fn [graph c]
@@ -351,9 +362,7 @@
         (fn [graph pc]
           (let [parent (first pc)
                 child (second pc)]
-            (-> graph
-              (change-add-list-dependency parent child)
-              (change-add-child parent child))))
+            (change-add-list-dependency graph child parent)))
         graph
         parent-child)))
   (let [changes (:changes graph)
@@ -376,11 +385,9 @@
     (defn loop-and-add [graph prev current group]
       (if-not (empty? group)
         (if (nil? current) ;;end of the list
-          (let [gcurr (first group)
+          (let [gcurr (first group) ;;so we just add every item of the group in a weird recursion fashion
                 new-graph (if-not (nil? prev)
-                            (-> graph
-                              (change-add-child prev gcurr)
-                              (change-add-list-dependency gcurr prev))
+                            (change-add-list-dependency graph gcurr prev)
                             graph)]
             (recur new-graph gcurr nil (rest group)))
           (let [gcurr (first group)
@@ -389,15 +396,10 @@
             (if (< gidx idx)
               ;;the first of our group must be inserted here
               (let [current-added-graph
-                    (->
-                      graph
-                      (change-add-list-dependency current gcurr) 
-                      (change-add-child gcurr current))
+                    (change-add-list-dependency graph current gcurr)
                     prev-added-graph
                     (if-not (nil? prev)
-                      (-> current-added-graph
-                        (change-add-child prev gcurr)
-                        (change-add-list-dependency gcurr prev))
+                      (change-add-list-dependency current-added-graph gcurr prev)
                       current-added-graph)]
                 (recur prev-added-graph gcurr current (rest group)))
               (recur graph current (change-child graph current) group))))
@@ -414,36 +416,37 @@
         listdeletes (filter delete? (filter list-operation? changes))
         grouped (group-by #(.getParent (:original %)) listdeletes)]
     (reduce
-      link-delete-group
+      (fn [graph group] (link-delete-group graph (sort-by :index group)))
       graph
       (mapcat #(vals (group-by :property %)) (vals grouped)))))
 
-(defn- link-group-roots [graph]
-  "Links the head of a list to the parent of all the elements in the list."
-  (defn find-and-set-root [graph operation roots]
-    (let [poss-roots (filter #(change-change-dependent-default? graph % operation) 
-                       (filter #(not= operation %) roots))
-          root (first poss-roots)]
-      (if-not (nil? root)
-        (change-add-dependency graph root operation)
-        graph)))
-  (let [changes (:changes graph)
-        possible-roots (filter #(or (insert? %) (move? %)) changes)
-        ;;deletes should never be inside an insert as the node shouldnt get inserted in the first place
-        list-operations (remove delete? (filter list-operation? changes))
-        ;;group them by property and set the root of every property list
-        grouped-operations (group-by :left-parent list-operations)]
-      (reduce
-        (fn [g parented]
-          (let [property (group-by :property parented)]
-            (reduce
-              (fn [g prop]
-                (let [res (first (sort-by :index prop))]
-                  (find-and-set-root g res possible-roots)))
-              g
-              (vals property))))
-        graph
-        (vals grouped-operations))))
+(comment
+  (defn- link-group-roots [graph]
+    "Links the head of a list to the parent of all the elements in the list."
+    (defn find-and-set-root [graph operation roots]
+      (let [poss-roots (filter #(change-change-dependent-default? graph % operation) 
+                         (filter #(not= operation %) roots))
+            root (first poss-roots)]
+        (if-not (nil? root)
+          (change-add-dependency graph root operation)
+          graph)))
+    (let [changes (:changes graph)
+          possible-roots (filter #(or (insert? %) (move? %)) changes)
+          ;;deletes should never be inside an insert as the node shouldnt get inserted in the first place
+          list-operations (remove delete? (filter list-operation? changes))
+          ;;group them by property and set the root of every property list
+          grouped-operations (group-by :left-parent list-operations)]
+        (reduce
+          (fn [g parented]
+            (let [property (group-by :property parented)]
+              (reduce
+                (fn [g prop]
+                  (let [res (first (sort-by :index prop))]
+                    (find-and-set-root g res possible-roots)))
+                g
+                (vals property))))
+          graph
+          (vals grouped-operations)))))
  
 
 (defn- add-roots-to-graph [graph]
@@ -503,7 +506,7 @@
       change-link-direct-dependents
       link-list-dependents
       link-delete-dependents
-      link-group-roots
+      ;;link-group-roots
       remove-cycles
       add-roots-to-graph)))
 
@@ -515,6 +518,16 @@
 
 (defn graph-order [graph]
   (count (:changes graph)))
+
+(defn graph-change-parent [graph change]
+  (let [parent (nth (:parent graph) (:graph-idx change))]
+    (when parent
+      (nth (:changes graph) parent))))
+
+(defn graph-change-child [graph change]
+  (let [child (nth (:child graph) (:graph-idx change))]
+    (when child
+      (nth (:changes graph) child))))
 
 ;;declarative graph generation or smthg like that
 (defn graph-change|insert [graph ?insert]

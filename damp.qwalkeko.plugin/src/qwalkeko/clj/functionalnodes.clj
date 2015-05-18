@@ -198,7 +198,7 @@
   ([graph change-idx visited]
     (if (visited change-idx)
       #{}
-      (let [deps (nth (:dependencies graph) change-idx)]
+      (let [deps (set (nth (:dependencies graph) change-idx))]
         (into deps
           (mapcat #(change-dependencies-idx-recursive graph % (conj visited change-idx)) deps))))))
  
@@ -455,10 +455,7 @@
                 (seq (range (graph-order graph))))]
     (assoc graph :roots roots)))
 
-
-(defn- remove-cycles [graph]
-  "It is possible to have cycles by having an insert that overwrites a move
-   while that move moves the node back into the insert. We can fix it by replacing that move with an insert."
+(defn remove-insert-move-cycles [graph]
   (defn replace-move [graph move inserts]
     (let [convertor (if (:index move) map->CListInsert map->CInsert)
           new-insert (convertor {:operation :insert
@@ -499,6 +496,27 @@
       graph
       bad-moves)))
 
+(defn- remove-move-cycles [graph]
+  (let [moves (filter move? (:changes graph))
+        badmoves (filter (fn [move]
+                           ((change-dependencies-idx-recursive graph (:graph-idx move))
+                             (:graph-idx move))))]
+    
+  )
+
+
+(defn- remove-cycles [graph]
+  "Removes dependency cycles from the dependency graph, turning it into a DAG."
+  ;There are several possibilities to have cycles:
+  ;First, it is possible to have cycles by having an insert that overwrites a move
+  ;while that move moves the node back into the insert. We can fix it by replacing that move with an insert.
+  ;Second, a 'swap' may occur, in which move A overwrites the source of move B, and move B needs to go to move A.
+  ;This may also happen in larger groups, in which A moves to B, B moves to C, and C moves to A.
+  ;We can solve this by ordering these moves and replacing 1 of them by an Insert
+  (-> graph
+    remove-insert-move-cycles
+    remove-move-cycles))
+
 (defn create-dependency-graph [changes]
   (let [graph (changes->graph changes)]
     (->
@@ -506,7 +524,6 @@
       change-link-direct-dependents
       link-list-dependents
       link-delete-dependents
-      ;;link-group-roots
       remove-cycles
       add-roots-to-graph)))
 

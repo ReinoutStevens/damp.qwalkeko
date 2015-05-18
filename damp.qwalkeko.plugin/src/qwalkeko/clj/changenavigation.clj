@@ -99,7 +99,7 @@
         lparent (:left-parent change)
         lnode (:copy change)
         mlparent (graph-corresponding-node-latest-ast new-graph lparent)
-        index (graph-change-current-index (changes/graph-change-parent graph change) (:index change))
+        index (graph-change-current-index graph (changes/graph-change-parent graph change) (:index change))
         new-insert (new Insert nil mlparent lparent 
                      lnode
                      (astnode/node-property-descriptor-for-ekeko-keyword lparent prop)
@@ -111,9 +111,10 @@
         prop (:property change)
         lparent (:left-parent change)
         lnode (:copy change)
+        rnode (qwalkeko.clj.ast/has-clj-unwrapped prop lparent)
         mnode (graph-corresponding-node-latest-ast new-graph lnode)
         mlparent (graph-corresponding-node-latest-ast new-graph lparent)
-        new-move (new Move nil mnode mlparent lparent 
+        new-move (new Move nil mnode mlparent rnode 
                    (astnode/node-property-descriptor-for-ekeko-keyword lparent prop)
                    -1)]
     (java-change-apply new-graph new-move (:graph-idx change))))
@@ -124,9 +125,10 @@
         lparent (:left-parent change)
         lnode (:copy change)
         mnode (graph-corresponding-node-latest-ast new-graph lnode)
+        rnode (nth (seq (qwalkeko.clj.ast/has-clj-unwrapped prop lparent)) (:index change))
         mlparent (graph-corresponding-node-latest-ast new-graph lparent)
-        index  (graph-change-current-index (changes/graph-change-parent graph change) (:index change))
-        new-move (new Move nil mnode mlparent lparent 
+        index  (graph-change-current-index graph (changes/graph-change-parent graph change) (:index change))
+        new-move (new Move nil mnode mlparent rnode 
                    (astnode/node-property-descriptor-for-ekeko-keyword lparent prop)
                    index)]
     (java-change-apply new-graph new-move (:graph-idx change))))

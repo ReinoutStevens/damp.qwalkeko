@@ -196,7 +196,7 @@
 
 ;;Navigatable Graph
 (defrecord NavigatableChangeGraph 
-  [left right differencer changes roots dependents dependency child ast-map asts applied current]
+  [left right differencer changes roots dependents dependencies child ast-map asts applied current]
   clojure.core.logic.protocols/IUninitialized
   (-uninitialized [_] (NavigatableChangeGraph. nil nil nil nil nil nil nil nil nil nil nil nil)))
 

@@ -36,25 +36,25 @@
   clojure.core.logic.protocols/IUninitialized
   (-uninitialized [_] (CDelete. :delete nil nil nil nil nil)))
 
-(defrecord CMove [operation original copy left-parent right-parent property index graph-idx]
+(defrecord CMove [operation original copy left-parent right-parent property index graph-idx prime-parent]
   clojure.core.logic.protocols/IUninitialized
-  (-uninitialized [_] (CMove. :move nil nil nil nil nil nil nil)))
+  (-uninitialized [_] (CMove. :move nil nil nil nil nil nil nil nil)))
 
 (defrecord CUpdate [operation original copy left-parent right-parent property graph-idx]
   clojure.core.logic.protocols/IUninitialized
   (-uninitialized [_] (CUpdate. :update nil nil nil nil nil nil)))
 
-(defrecord CInsert [operation original copy left-parent right-parent property index graph-idx]
+(defrecord CInsert [operation original copy left-parent right-parent property index graph-idx left-removed]
   clojure.core.logic.protocols/IUninitialized
-  (-uninitialized [_] (CInsert. :insert nil nil nil nil nil nil nil)))
+  (-uninitialized [_] (CInsert. :insert nil nil nil nil nil nil nil nil)))
 
 (defrecord CListDelete  [operation original copy property index dependency graph-idx]
   clojure.core.logic.protocols/IUninitialized
   (-uninitialized [_] (CListDelete. :delete nil nil nil nil nil nil)))
 
-(defrecord CListMove [operation original copy left-parent right-parent property index graph-idx]
+(defrecord CListMove [operation original copy left-parent right-parent property index graph-idx prime-parent]
   clojure.core.logic.protocols/IUninitialized
-  (-uninitialized [_] (CListMove. :move nil nil nil nil nil nil nil)))
+  (-uninitialized [_] (CListMove. :move nil nil nil nil nil nil nil nil)))
 
 (defrecord CListInsert [operation original copy left-parent right-parent property index graph-idx]
   clojure.core.logic.protocols/IUninitialized
@@ -100,7 +100,8 @@
            :right-parent  (.getRightParent operation)
            :property prop
            :index idx
-           :graph-idx nil}]
+           :graph-idx nil
+           :left-removed (.getLeftRemoved operation)}]
     (if idx
       (map->CListInsert m)
       (map->CInsert m))))
@@ -115,7 +116,8 @@
            :right-parent (.getParent (.getRightNode operation))
            :property prop
            :index idx
-           :graph-idx nil}]
+           :graph-idx nil
+           :prime-parent (.getLeftPrimeParent operation)}]
     (if idx
       (map->CListMove m)
       (map->CMove m))))
@@ -323,6 +325,9 @@
                   (iterate #(.getParent %) (:original move)))]
     (or
       (move-change-dependent-default? graph move insert)
+      (some #(= (:left-removed insert) %) ;;insert removes the part in which move resides
+        (take-while #(not (nil? %)) 
+          (iterate #(.getParent %) (:prime-parent move))))
       (and 
         insert-parent
         (not (instance? CListMove move))
@@ -467,7 +472,9 @@
                                  :index (:index move)
                                  :graph-idx (:graph-idx move)})
           dependencies (reduce (fn [deps i]
-                                 (update-in deps [(:graph-idx i)] disj (:graph-idx move)))
+                                 (if (change-change-dependent? graph new-insert i) ;;i may still be dependent if it is not the main cause of the cycle
+                                   deps
+                                   (update-in deps [(:graph-idx i)] disj (:graph-idx move))))
                          (:dependencies graph)
                          inserts)
           new-changes (assoc (:changes graph) (:graph-idx move) new-insert)]
@@ -500,12 +507,13 @@
   (let [moves (filter move? (:changes graph))
         badmoves (filter (fn [move]
                            ((change-dependencies-idx-recursive graph (:graph-idx move))
-                             (:graph-idx move))))]
+                             (:graph-idx move)))
+                           moves)]
     
-  )
+    graph))
 
 
-(defn- remove-cycles [graph]
+(defn remove-cycles [graph]
   "Removes dependency cycles from the dependency graph, turning it into a DAG."
   ;There are several possibilities to have cycles:
   ;First, it is possible to have cycles by having an insert that overwrites a move
@@ -513,9 +521,9 @@
   ;Second, a 'swap' may occur, in which move A overwrites the source of move B, and move B needs to go to move A.
   ;This may also happen in larger groups, in which A moves to B, B moves to C, and C moves to A.
   ;We can solve this by ordering these moves and replacing 1 of them by an Insert
-  (-> graph
-    remove-insert-move-cycles
-    remove-move-cycles))
+    (-> graph
+      remove-insert-move-cycles
+      remove-move-cycles))
 
 (defn create-dependency-graph [changes]
   (let [graph (changes->graph changes)]

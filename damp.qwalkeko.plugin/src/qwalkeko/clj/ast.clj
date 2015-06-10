@@ -89,7 +89,7 @@
          (el/contains
            (seq
              (filter
-               #(ast-clj? type %)
+               #(ast-clj? ?type %)
                (iterator-seq 
                  (new changenodes.comparing.BreadthFirstNodeIterator ?node))))
              ?child))])))

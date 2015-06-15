@@ -29,22 +29,30 @@
          new-ast (AST/newAST AST/JLS8)
          left-copy (ASTNode/copySubtree new-ast current-ast)
          mapped (link-asts current-ast left-copy)
-         current-map (get (:ast-map graph) (.getAST current-ast))
+         current-map (get (:prime-to-int-map graph) (.getAST current-ast))
          new-map (apply hash-map 
                    (mapcat 
-                     (fn [l] [l (get mapped (get current-map l))]) (keys current-map)))]
+                     (fn [l] [l (get mapped (get current-map l))]) (keys current-map)))
+         new-list {:ast (.getAST current-ast) :map mapped}]
      (-> graph
        (update-in [:asts] conj left-copy)
-       (update-in [:ast-map] assoc new-ast new-map))))
+       (update-in [:int-to-int-list] conj new-list)
+       (update-in [:prime-to-int-map] assoc new-ast new-map))))
 
 (defn graph-corresponding-node [graph ast node]
-  (let [ast-map (:ast-map graph)
+  (let [ast-map (:prime-to-int-map graph)
         node-map (get ast-map ast)]
     (get node-map node)))
 
 (defn graph-corresponding-node-latest-ast [graph node]
   (let [ast (.getAST (first (:asts graph)))]
     (graph-corresponding-node graph ast node)))
+
+;;Tracking of nodes throughout the Intermediate ASTs
+;;Two options: either the node is present in Target or the node is removed in Target, meaning it needs to be present in Source
+;;In case of the latter: distilling should never add random nodes
+
+
 
 ;;independent indexes
 (defmulti graph-change-current-index (fn [graph change idx] (class change)))
@@ -71,11 +79,12 @@
 
 (defn java-change-apply [graph jchange idx]
   (let [new-ast (first (:asts graph))
-        ast-map (get (:ast-map graph) (.getAST new-ast))
+        ast-map (get (:prime-to-int-map graph) (.getAST new-ast))
+        int-list (:map (first (:int-to-int-list graph)))
         hash-map (java.util.HashMap. ast-map)]
     (.apply jchange (java.util.HashMap.) hash-map)
     (-> graph 
-      (assoc :ast-map (assoc (:ast-map graph) (.getAST new-ast) (into {} hash-map)))
+      (assoc :prime-to-int-map (assoc (:prime-to-int-map graph) (.getAST new-ast) (into {} hash-map)))
       (assoc :current idx)
       (update-in [:applied] (fn [app] (assoc app idx true))))))
 
@@ -196,17 +205,19 @@
 
 ;;Navigatable Graph
 (defrecord NavigatableChangeGraph 
-  [left right differencer changes roots dependents dependencies child ast-map asts applied current]
+  [left right differencer changes roots dependents dependencies child int-to-int-list prime-to-int-map asts applied current]
   clojure.core.logic.protocols/IUninitialized
-  (-uninitialized [_] (NavigatableChangeGraph. nil nil nil nil nil nil nil nil nil nil nil nil)))
+  (-uninitialized [_] (NavigatableChangeGraph. nil nil nil nil nil nil nil nil nil nil nil nil nil)))
 
 (defmethod print-method NavigatableChangeGraph [graph ^java.io.Writer w]
-  (print-method (dissoc graph :ast-map :asts :changes) w))
+  (print-method (dissoc graph :int-to-int-list :prime-to-int-map :asts :changes) w))
 
 (defn graph-to-navigatable-graph [graph left right]
   (let [diff (:differencer graph)
         copy-original (into {} (.getCopyToOriginal diff))
-        ast-map {(.getAST left)  copy-original}
+        original-copy (clojure.set/map-invert copy-original)
+        prime-int-map {(.getAST left)  copy-original}
+        int-prime-list '()
         dependents (reduce 
                      (fn [res i] 
                        (let [deps (nth (:dependencies graph) i)]
@@ -220,7 +231,8 @@
     (map->NavigatableChangeGraph 
       (assoc graph 
         :dependencies (map seq (:dependencies graph)) ;;core.logic does not like sets
-        :ast-map ast-map 
+        :prime-to-int-map prime-int-map
+        :int-to-int-list int-prime-list
         :asts (list left) 
         :dependents (map seq dependents) ;;core.logic still does not like sets
         :left left :right right
@@ -245,13 +257,14 @@
 
 (defn graph-next-changes [graph]
   (let [unapplied (remove #(graph-change-applied? graph %) (range (changes/graph-order graph)))]
-    (filter
-      (fn [i]
-        (every?
-          (fn [c]
-            (graph-change-applied? graph c))
-          (nth (:dependencies graph) i)))
-      unapplied)))
+    (seq
+      (filter
+        (fn [i]
+          (every?
+            (fn [c]
+              (graph-change-applied? graph c))
+            (nth (:dependencies graph) i)))
+        unapplied))))
 
 (defn change-> [_ current ?next]
   (logic/fresh [?changes ?change-idx ?change]
@@ -263,12 +276,12 @@
       (logic/project [?change]
         (logic/== ?next (change-apply current ?change))))))
 
-(defn change->* [_ current ?next]
+(defn change->* [g current ?next]
   (logic/conde
     [(logic/== current ?next)]
     [(logic/fresh [?neext]
-       (change-> _ current ?neext)
-       (change->* _ ?neext ?next))]))
+       (change-> g current ?neext)
+       (change->* g ?neext ?next))]))
 
 (defn change->+ [_ current ?next]
   (logic/fresh [?neext]
@@ -276,10 +289,23 @@
     (change->* _ ?neext ?next)))
 
 
-(defn graph-node-node-ast-corresponding [graph original ?node ast]
-  (logic/project [graph original ast]
-    (logic/== ?node (graph-change-convert-to-ast graph original ast))
-    (logic/!= ?node nil)))
+(defn graph-node-tracked [graph node]
+  (let [ast (.getAST node)
+        map (take-while #(not= (:ast %) ast) (:int-to-int-list graph))
+        reversed (rest (reverse map))]
+    (reduce
+      (fn [n l]
+        (let [head (first l)]
+          (get (:map head) n)))
+      node
+      reversed)))
+
+
+(defn graph-node-node|tracked [graph node ?corresponding]
+  "Finds the representation of node in the current ast of graph"
+  (logic/project [graph node]
+    (logic/== ?corresponding (graph-node-tracked graph node))
+    (logic/!= nil ?corresponding)))
 
 (defmacro with-last-change [[current ast change] & goals]
   `(fn [graph# ~current next#]

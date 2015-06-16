@@ -267,14 +267,15 @@
         unapplied))))
 
 (defn change-> [_ current ?next]
-  (logic/fresh [?changes ?change-idx ?change]
-    (logic/== ?changes (graph-next-changes current))
-    (logic/!= ?changes nil)
-    (el/contains ?changes ?change-idx)
-    (logic/project [?change-idx]
-      (logic/== ?change (changes/graph-change-idx current ?change-idx))
-      (logic/project [?change]
-        (logic/== ?next (change-apply current ?change))))))
+  (logic/project [current]
+    (logic/fresh [?changes ?change-idx ?change]
+      (logic/== ?changes (graph-next-changes current))
+      (logic/!= ?changes nil)
+      (el/contains ?changes ?change-idx)
+      (logic/project [?change-idx]
+        (logic/== ?change (changes/graph-change-idx current ?change-idx))
+        (logic/project [?change]
+          (logic/== ?next (change-apply current ?change)))))))
 
 (defn change->* [g current ?next]
   (logic/conde

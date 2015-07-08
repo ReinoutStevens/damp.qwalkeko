@@ -28,8 +28,7 @@
 ;;;; indexes should always be converted to a concrete change against the current graph as old concrete changes
 ;;;; may no longer be correct. Indexes remain unique throughout the lifetime of the graph.
 
-;;;; Most changes have a :original, :copy, :left-parent and :right-parent
-;;;; :original 
+;;;; Most changes have a :original, :copy, :left-parent and :right-parent 
 
 ;;Clojure Representation of a Change
 (defrecord CDelete  [operation original copy property index graph-idx]

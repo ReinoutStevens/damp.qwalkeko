@@ -12,12 +12,24 @@
    (:require [damp.ekeko.jdt
               [ast :as jdt]]))
 
+;;File implementing the intermediate AST graph using a dependency graph
+;;Nodes are constructed on the fly when required
+;;The implementation is completely functional, so new objects are always returned
+
+;;Currently, the notion of graphs and nodes are mixed
+;;A node is represented by the complete graph: it contains the path of applied changes and the ASTs along that path
+;;This way we retrieve the AST corresponding with that node
+;;The implementation should be modified so there is a distinct notion between nodes and graphs
+;;so that information can be reused across nodes (like the AST of two nodes with different change paths, but that have the same change set)
+
 
 ;;applying changes
 (defn- link-sequences [left-seq copy-seq]
   (apply assoc {} (interleave left-seq copy-seq)))
 
 (defn- link-asts [left right]
+  "Creates a map that maps nodes in left AST to right AST.
+   Assumes both ASTs are equal."
   (let [left-iter (new DepthFirstNodeIterator left)
         right-iter (new DepthFirstNodeIterator right)
         left-seq (iterator-seq left-iter)
@@ -25,6 +37,8 @@
     (link-sequences left-seq right-seq)))
 
 (defn graph-prepare-for-change [graph]
+  "Prepares an IAG node for a new change by copying the latest AST
+   and extending the current maps. Returns a new graph."
    (let [current-ast (first (:asts graph))
          new-ast (AST/newAST AST/JLS8)
          left-copy (ASTNode/copySubtree new-ast current-ast)
@@ -45,17 +59,15 @@
     (get node-map node)))
 
 (defn graph-corresponding-node-latest-ast [graph node]
+  "Returns the current representation of ASTnode from source' in the latest ast of graph.
+   This is used to apply changes on an intermediate AST"
   (let [ast (.getAST (first (:asts graph)))]
     (graph-corresponding-node graph ast node)))
 
-;;Tracking of nodes throughout the Intermediate ASTs
-;;Two options: either the node is present in Target or the node is removed in Target, meaning it needs to be present in Source
-;;In case of the latter: distilling should never add random nodes
-
-
-
 ;;independent indexes
-(defmulti graph-change-current-index (fn [graph change idx] (class change)))
+(defmulti graph-change-current-index  
+  "Computes the index of a listchange depending whether previous listchanges have been applied"
+  (fn [graph change idx] (class change)))
 
 (defmethod graph-change-current-index :default [graph change idx]
   idx)
@@ -78,6 +90,7 @@
 
 
 (defn java-change-apply [graph jchange idx]
+  "applies a java change on graph. Idx is the index of the corresponding clojure change"
   (let [new-ast (first (:asts graph))
         ast-map (get (:prime-to-int-map graph) (.getAST new-ast))
         int-list (:map (first (:int-to-int-list graph)))
@@ -88,7 +101,9 @@
       (assoc :current idx)
       (update-in [:applied] (fn [app] (assoc app idx true))))))
 
-(defmulti change-apply (fn [graph change] (class change)))
+(defmulti change-apply 
+  "applies a clojure change to the latest ast of graph"
+  (fn [graph change] (class change)))
 
 (defmethod change-apply qwalkeko.clj.functionalnodes.CInsert [graph change]
   (let [new-graph (graph-prepare-for-change graph)
@@ -169,7 +184,10 @@
     (java-change-apply new-graph new-update (:graph-idx change))))
 
 
-(defmulti graph-change-convert-to-ast (fn [graph change ast] (class change)))
+(defmulti graph-change-convert-to-ast 
+  "Converts a change so it can be applied on a given AST.
+   Assumes all of the change dependencies are resolved."
+  (fn [graph change ast] (class change)))
 
 (defmethod graph-change-convert-to-ast :default [graph change ast]
   nil)
@@ -266,7 +284,9 @@
             (nth (:dependencies graph) i)))
         unapplied))))
 
-(defn change-> [_ current ?next]
+(defn change-> 
+  "applies a single change on current"
+  [_ current ?next]
   (logic/project [current]
     (logic/fresh [?changes ?change-idx ?change]
       (logic/== ?changes (graph-next-changes current))
@@ -277,7 +297,16 @@
         (logic/project [?change]
           (logic/== ?next (change-apply current ?change)))))))
 
+
+
+(defn change->? [_ current ?next]
+  "applies zero or 1 changes on current"
+  (logic/conde
+    [(logic/== current ?next)]
+    [(change-> _ current ?next)]))
+
 (defn change->* [g current ?next]
+  "applies an arbitrary, including zero, changes on current"
   (logic/conde
     [(logic/== current ?next)]
     [(logic/fresh [?neext]
@@ -285,6 +314,7 @@
        (change->* g ?neext ?next))]))
 
 (defn change->+ [_ current ?next]
+  "applies an arbitrary, non-zero, changes on current"
   (logic/fresh [?neext]
     (change-> _ current ?neext)
     (change->* _ ?neext ?next)))
@@ -303,12 +333,13 @@
 
 
 (defn graph-node-node|tracked [graph node ?corresponding]
-  "Finds the representation of node in the current ast of graph"
+  "Finds the representation of a node retrieved in a previous ias in the current ast of graph"
   (logic/project [graph node]
-    (logic/== ?corresponding (graph-node-tracked graph node))
-    (logic/!= nil ?corresponding)))
+    (logic/== ?corresponding (graph-node-tracked graph node))))
 
 (defmacro with-last-change [[current ast change] & goals]
+  "Binds current to current node, ast to the ast of that node and change to the last applied change.
+   Evaluates goals."
   `(fn [graph# ~current next#]
      (logic/fresh [~ast ~change]
        (logic/== ~ast (first (:asts ~current)))
@@ -320,10 +351,12 @@
        (logic/== next# ~current))))
 
 (defmacro in-current-change-state [[current ast] & goals]
-  `(with-last-change [~current ~ast change# ] 
+  "Same as with-last-change, except change is not exposed to the user."
+  `(with-last-change [~current ~ast change#] 
      ~@goals))
 
 (defmacro step-changes [navigatable ?end [& bindings ] & goals]
+  "Launches a Qwal Query over an IAG."
   `(logic/fresh [graph#]
      (logic/== graph# ~navigatable)
      (damp.qwal/qwal graph# graph# ~?end [~@bindings]

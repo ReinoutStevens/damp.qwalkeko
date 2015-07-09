@@ -124,7 +124,7 @@
 (defmethod convert-operation Update [operation]
   (let [prop (convert-property (.getProperty operation))
         m {:operation :update
-           :original (ast/has-clj-unwrapped prop (.getOriginal operation))
+           :original (ast/has-clj prop (.getOriginal operation))
            :copy (ast/has-clj prop (.getLeftParent operation))
            :left-parent (.getLeftParent operation)
            :right-parent (.getRightParent operation)

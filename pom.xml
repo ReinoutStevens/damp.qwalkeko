@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project>
 
-	 <!-- This assumes damp.ekeko to be a sibling of this directory. --> 
+	 <!-- This assumes damp.ekeko to be a sibling of this directory. -->
 
 	<modelVersion>4.0.0</modelVersion>
 
@@ -20,15 +20,15 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<tycho.version>0.20.0</tycho.version>
-		<tycho-extras.version>0.20.0</tycho-extras.version>
-		<luna-repo.url>http://download.eclipse.org/releases/luna</luna-repo.url>
+		<tycho.version>0.23.0</tycho.version>
+		<tycho-extras.version>0.23.0</tycho-extras.version>
+		<mars-repo.url>http://download.eclipse.org/releases/mars</mars-repo.url>
 	</properties>
 
 	<repositories>
 		<repository>
-			<id>luna</id>
-			<url>${luna-repo.url}</url>
+			<id>mars</id>
+			<url>${mars-repo.url}</url>
 			<layout>p2</layout>
 		</repository>
 	</repositories>
@@ -129,7 +129,7 @@
 	</build>
 
 	<profiles>
-		<!-- when built with this profile, pre-built dependencies will be fetched 
+		<!-- when built with this profile, pre-built dependencies will be fetched
 			from the public update-site -->
 		<profile>
 			<id>build-individual-bundles</id>
@@ -144,4 +144,4 @@
 	</profiles>
 
 
-</project> 
+</project>

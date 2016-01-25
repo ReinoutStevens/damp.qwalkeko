@@ -183,6 +183,28 @@
                      (astnode/node-property-descriptor-for-ekeko-keyword lparent prop))]
     (java-change-apply new-graph new-update (:graph-idx change))))
 
+(defmethod change-apply qwalkeko.clj.functionalnodes.CMoveDelete [graph change]
+  (let [new-graph (graph-prepare-for-change graph)
+        prop (:property change)
+        lparent (:left-parent change)
+        mlparent (graph-corresponding-node-latest-ast new-graph lparent)
+        mnode (qwalkeko.clj.ast/has-clj-unwrapped prop mlparent)
+        new-delete (new Delete nil mnode)]
+    (java-change-apply new-graph new-delete (:graph-idx change))))
+
+
+(defmethod change-apply qwalkeko.clj.functionalnodes.CListMoveDelete [graph change]
+  (let [new-graph (graph-prepare-for-change graph)
+        prop (:property change)
+        lparent (:left-parent change)
+        mlparent (graph-corresponding-node-latest-ast new-graph lparent)
+        jprop (prop (astnode/reifiers mlparent))
+        idx (graph-change-current-index graph (nth (:changes graph) (:move-idx change)) (:idx change))
+        mnode (nth (seq (.getStructuralProperty mlparent jprop)) idx)
+        new-delete (new Delete nil mnode)]
+    (java-change-apply new-graph new-delete (:graph-idx change))))
+
+
 
 (defmulti graph-change-convert-to-ast 
   "Converts a change so it can be applied on a given AST.
@@ -273,16 +295,33 @@
         unapplied (remove #(graph-change-applied? graph %) roots)]
     unapplied))
 
+
+(defn graph-change-dependencies-applied? [graph idx]
+  (fn [i]
+    (every?
+      (fn [c]
+        (graph-change-applied? graph c))
+      (nth (:dependencies graph) idx))))
+
 (defn graph-next-changes [graph]
   (let [unapplied (remove #(graph-change-applied? graph %) (range (changes/graph-order graph)))]
     (seq
       (filter
         (fn [i]
-          (every?
-            (fn [c]
-              (graph-change-applied? graph c))
-            (nth (:dependencies graph) i)))
+          (graph-change-dependencies-applied? graph i))
         unapplied))))
+
+
+(defn change-dependencies-apply [graph change]
+  (let [new-graph (if (graph-change-applied? graph (:graph-idx change))
+                    graph
+                    (change-apply graph change))
+        dependents (filter #(graph-change-dependencies-applied? new-graph %)
+                     (nth (:dependents new-graph) (:graph-idx change)))]
+    (reduce
+     change-dependencies-apply 
+     new-graph
+     (map #(nth (:changes new-graph) %) dependents))))
 
 (defn change-> 
   "applies a single change on current"
@@ -296,8 +335,6 @@
         (logic/== ?change (changes/graph-change-idx current ?change-idx))
         (logic/project [?change]
           (logic/== ?next (change-apply current ?change)))))))
-
-
 
 (defn change->? [_ current ?next]
   "applies zero or 1 changes on current"
@@ -318,6 +355,35 @@
   (logic/fresh [?neext]
     (change-> _ current ?neext)
     (change->* _ ?neext ?next)))
+
+
+(defn change==>
+  "applies a change and all its dependents on current"
+  [_ current ?next]
+  (logic/project [current]
+    (logic/fresh [?changes ?change-idx ?change]
+      (logic/== ?changes (graph-next-changes current))
+      (logic/!= ?changes nil)
+      (el/contains ?changes ?change-idx)
+      (logic/project [?change-idx]
+            (logic/== ?change (changes/graph-change-idx current ?change-idx))
+            (logic/project [?change]
+              (logic/== ?next (change-dependencies-apply current ?change)))))))
+
+
+(defn change==>* [g current ?next]
+  "applies a change and all of its dependents an arbitry number of times"
+  (logic/conde
+    [(logic/== current ?next)]
+    [(logic/fresh [?neext]
+       (change==> g current ?neext)
+       (change==>* g ?neext ?next))]))
+
+(defn change==>+ [g current ?next]
+  "applies a change and all of its dependents an arbitry number of times"
+  (logic/fresh [?neext]
+    (change==> g current ?neext)
+    (change==>* g ?neext ?next)))
 
 
 (defn graph-node-tracked [graph node]
@@ -361,3 +427,7 @@
      (logic/== graph# ~navigatable)
      (damp.qwal/qwal graph# graph# ~?end [~@bindings]
                     	       ~@goals)))
+
+
+(defn sorted-solutions [solutions]
+  (sort-by #(count (:applied %)) < solutions))

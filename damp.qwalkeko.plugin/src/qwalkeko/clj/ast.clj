@@ -108,6 +108,11 @@
     (jdt/child :modifiers ?typedeclaration ?modifier)
     (modifier|public? ?modifier)))
 
+(defn typedeclaration-string|named [?typedeclaration ?string]
+  (logic/fresh [?name]
+    (jdt/ast :TypeDeclaration ?typedeclaration)
+    (jdt/has :name ?typedeclaration ?name)
+    (jdt/name|simple-string ?name ?string)))
 
 
 (defn compilationunit-typedeclaration|main [?compunit ?typedeclaration]
@@ -138,8 +143,7 @@
       (jdt/has :name ?rightmain ?rightname)
       (jdt/name-name|same|qualified ?leftname ?rightname))))
 
-
-(defn method-cu-method-cu|corresponding [?left-method left ?right-method right]
+(defn method-cu-method-cu|same-name [?left-method left ?right-method right]
   "finds the corresponding method declaration of left in the current version"
   ;;probably better to compute changes to detect renames as well
   (logic/fresh [?left-name ?right-name]
@@ -147,18 +151,15 @@
     (child+-type right :MethodDeclaration ?right-method)
     (jdt/has :name ?right-method ?right-name)
     (jdt/has :name ?left-method ?left-name)
-    (jdt/name|simple-name|simple|same ?left-name ?right-name)
-    (method-method|same-signature ?left-method ?right-method)))
-
+    (jdt/name|simple-name|simple|same ?left-name ?right-name)))
 
 (defn method-cu-method-cu|corresponding [?left-method left ?right-method right]
-   (logic/fresh [?left-method ?left-name ?right-name]
-     (child+-type left :MethodDeclaration ?left-method)
-     (child+-type right :MethodDeclaration ?right-method)
-     (jdt/has :name ?left-method ?left-name)
-     (jdt/has :name ?right-method ?right-name)
-     (jdt/name|simple-name|simple|same ?left-name ?right-name)
-     (method-method|same-signature ?left-method ?right-method)))
+  "finds the corresponding method declaration of left in the current version"
+  ;;probably better to compute changes to detect renames as well
+  (logic/fresh [?left-name ?right-name]
+    (method-cu-method-cu|same-name ?left-method left ?right-method right)
+    (method-method|same-signature ?left-method ?right-method)))
+
 
 (defn method-cu-cu|introduced [?right-method right left]
   "right-method is added in right-cu and was not presented in left-cu.

@@ -47,6 +47,14 @@
   clojure.core.logic.protocols/IUninitialized
   (-uninitialized [_] (CInsert. :insert nil nil nil nil nil nil nil nil)))
 
+(defrecord CMoveDelete [operation original left-parent property index move-idx graph-idx]
+  clojure.core.logic.protocols/IUninitialized
+  (-uninitialized [_] (CMoveDelete. :movedelete nil nil nil nil nil nil)))
+
+(defrecord CListMoveDelete [operation original left-parent property index move-idx graph-idx]
+  clojure.core.logic.protocols/IUninitialized
+  (-uninitialized [_] (CMoveDelete. :movedelete nil nil nil nil nil nil)))
+
 (defrecord CListDelete  [operation original copy property index dependency graph-idx]
   clojure.core.logic.protocols/IUninitialized
   (-uninitialized [_] (CListDelete. :delete nil nil nil nil nil nil)))
@@ -94,7 +102,7 @@
         original (.getOriginal operation)
         m {:operation :insert
            :original original
-           :copy (get-node-idx (.getAffectedNode operation) prop idx) ;newly inserted node in left
+           :copy (.getCopy operation)
            :left-parent (.getAffectedNode operation)
            :right-parent  (.getRightParent operation)
            :property prop
@@ -132,11 +140,69 @@
            :graph-idx nil}]
     (map->CUpdate m)))
 
+
+(defmethod convert-operation Delete [operation]
+  (let [idx (convert-index (.getIndex operation))
+        m {:operation :delete
+           :original (.getOriginal operation)
+           :copy (.getAffectedNode operation)
+           :index idx
+           :property (convert-property (.getLocationInParent (.getOriginal operation)))
+           :graph-idx nil}]
+    (if idx
+      (map->CListDelete m)
+      (map->CDelete m))))
+
+
+;;Moves of mandatory properties need to have a delete as well
+(declare move? change-dependencies-idx-recursive)
+(defn root-moves-to-delete [graph]
+  (defn output-delete [move]
+    (let [m {:operation :movedelete
+             :original (:original move)
+             :left-parent (:left-parent move)
+             :property (:property move)
+             :index (:index move)
+             :move-idx (:graph-idx move)
+             :graph-idx nil}]
+      (if (:index m)
+        (map->CListMoveDelete m)
+        (map->CMoveDelete m))))
+  (let [moves (filter move? (:changes graph))
+        move-idx (map :graph-idx moves)
+        root-moves (remove #(some
+                              (fn [dep]
+                                (some #{dep} move-idx))
+                              (change-dependencies-idx-recursive graph %))
+                     move-idx)
+        deletes
+        (map output-delete (map #(nth (:changes graph) %) root-moves))
+        deletes-idx
+        (map-indexed
+          (fn [idx d]
+            (assoc d :graph-idx (+ (count (:changes graph)) idx)))
+          deletes)
+        new-changes
+        (assoc graph 
+          :changes (vec (concat (:changes graph) deletes-idx))
+          :dependents (vec (concat (:dependents graph) (repeat (count deletes-idx) nil)))
+          :dependencies (vec (concat (:dependencies graph) (repeat (count deletes-idx) nil))))]
+    (reduce
+      (fn [graph delete]
+        (let [parent-move (nth (:changes graph) (:move-idx delete))
+              dependencies (set (change-dependencies-idx-recursive graph (:graph-idx parent-move)))]
+          (update-in graph [:dependencies]
+            assoc (:graph-idx delete) dependencies)))
+      new-changes
+      deletes-idx)))
+    
+
+
 ;;Interface with Java Differencer
-(defn- make-differencer [left-ast right-ast]
+(defn make-differencer [left-ast right-ast]
   (new changenodes.Differencer left-ast right-ast))
 
-(defn- difference [differencer]
+(defn difference [differencer]
   (.difference differencer)
   differencer)
 

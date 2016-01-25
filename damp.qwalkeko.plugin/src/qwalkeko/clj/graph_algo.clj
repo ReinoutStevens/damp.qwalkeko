@@ -85,4 +85,19 @@
             (let [r (seq (nth (:dependencies graph) key))]
               (if (nil? r) '() r)))
           keys)))))
+
+
+(defn longest-path [dag]
+  (defn value-for [idx v]
+    (let [incoming (nth (:dependencies dag) idx)
+          vs (conj (map (fn [i] (nth v i)) incoming) 0)]
+      (assoc v idx (inc (apply max vs)))))
+  (let [topo (topo-sort-graph dag)
+        v (vec (take (changes/graph-order dag) (repeat 0)))
+        lengths (reduce
+                  (fn [v i]
+                    (value-for i v))
+                  v
+                  topo)]
+    (apply max lengths)))
  

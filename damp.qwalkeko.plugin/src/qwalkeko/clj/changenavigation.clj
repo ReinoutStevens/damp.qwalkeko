@@ -297,11 +297,10 @@
 
 
 (defn graph-change-dependencies-applied? [graph idx]
-  (fn [i]
-    (every?
-      (fn [c]
-        (graph-change-applied? graph c))
-      (nth (:dependencies graph) idx))))
+  (every?
+    (fn [c]
+      (graph-change-applied? graph c))
+    (nth (:dependencies graph) idx)))
 
 (defn graph-next-changes [graph]
   (let [unapplied (remove #(graph-change-applied? graph %) (range (changes/graph-order graph)))]
@@ -310,6 +309,24 @@
         (fn [i]
           (graph-change-dependencies-applied? graph i))
         unapplied))))
+
+(defn change-dependencies-apply-alt [graph change]
+  (defn apply-dependents [g deps]
+    (if (empty? deps)
+      g
+      (recur (change-apply g (first deps)) (rest deps))))
+  (let [new-graph (if (graph-change-applied? graph (:graph-idx change))
+                    graph
+                    (change-apply graph change))
+        deps (map #(nth (:changes new-graph) %)
+               (filter #(graph-change-dependencies-applied? new-graph %)
+                 (remove #(graph-change-applied? new-graph %)
+                   (nth (:dependents new-graph) (:graph-idx change)))))
+        new-new-graph (apply-dependents new-graph deps)]
+    (reduce
+      change-dependencies-apply-alt
+      new-new-graph
+      deps)))
 
 
 (defn change-dependencies-apply [graph change]
@@ -368,7 +385,7 @@
       (logic/project [?change-idx]
             (logic/== ?change (changes/graph-change-idx current ?change-idx))
             (logic/project [?change]
-              (logic/== ?next (change-dependencies-apply current ?change)))))))
+              (logic/== ?next (change-dependencies-apply-alt current ?change)))))))
 
 
 (defn change==>* [g current ?next]

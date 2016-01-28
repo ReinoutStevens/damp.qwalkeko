@@ -402,6 +402,33 @@
     (change==> g current ?neext)
     (change==>* g ?neext ?next)))
 
+(defn change!=>
+  "applies a change and all its dependents on current"
+  [_ current ?next]
+  (logic/project [current]
+    (logic/fresh [?changes ?change-idx ?change]
+      (logic/== ?changes (graph-next-changes current))
+      (logic/!= ?changes nil)
+      (logic/onceo (el/contains ?changes ?change-idx))
+      (logic/project [?change-idx]
+            (logic/== ?change (changes/graph-change-idx current ?change-idx))
+            (logic/project [?change]
+              (logic/== ?next (change-dependencies-apply-alt current ?change)))))))
+
+
+(defn change!=>* [g current ?next]
+  "applies a change and all of its dependents an arbitry number of times"
+  (logic/conde
+    [(logic/== current ?next)]
+    [(logic/fresh [?neext]
+       (change!=> g current ?neext)
+       (change!=>* g ?neext ?next))]))
+
+(defn change!=>+ [g current ?next]
+  "applies a change and all of its dependents an arbitry number of times"
+  (logic/fresh [?neext]
+    (change!=> g current ?neext)
+    (change!=>* g ?neext ?next)))
 
 (defn graph-node-tracked [graph node]
   (let [ast (.getAST node)

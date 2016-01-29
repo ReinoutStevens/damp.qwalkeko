@@ -95,6 +95,8 @@
         ast-map (get (:prime-to-int-map graph) (.getAST new-ast))
         int-list (:map (first (:int-to-int-list graph)))
         hash-map (java.util.HashMap. ast-map)]
+;    (binding [*out* *err*]
+;      (println idx))   
     (.apply jchange (java.util.HashMap.) hash-map)
     (-> graph 
       (assoc :prime-to-int-map (assoc (:prime-to-int-map graph) (.getAST new-ast) (into {} hash-map)))
@@ -374,6 +376,7 @@
     (change->* _ ?neext ?next)))
 
 
+;;some more coarse-grained operators
 (defn change==>
   "applies a change and all its dependents on current"
   [_ current ?next]
@@ -430,6 +433,43 @@
     (change!=> g current ?neext)
     (change!=>* g ?neext ?next)))
 
+(defn change-limit=> [limit]
+  (defn limit-inner [g current ?next]
+    (logic/conda
+      [(logic/== true (< limit (count (filter true? (:applied current)))))
+       logic/fail]
+      [logic/succeed
+       (logic/conde
+         [(logic/fresh [?neext]
+            (change==> g current ?neext)
+            (limit-inner g ?neext ?next))]
+         [(logic/== current ?next)])]))
+  limit-inner)
+      
+(defn change-limit-> [limit]
+  (defn limit-inner [g current ?next]
+    (logic/conda
+      [(logic/== true (< limit (count (filter true? (:applied current)))))
+       logic/fail]
+      [logic/succeed
+       (logic/conde
+         [(logic/fresh [?neext]
+            (change-> g current ?neext)
+            (limit-inner g ?neext ?next))]
+         [(logic/== current ?next)])]))
+  limit-inner)
+      
+(defn change-sol-> [solution]
+  (defn do-solution-magic [graph changes]
+    (let [real-changes (map #(nth (:changes graph) %) changes)]
+      (reduce
+        change-apply
+        graph
+        real-changes)))
+  (fn [graph current next]
+    (logic/project [solution]
+      (logic/== next (do-solution-magic current solution)))))
+
 (defn graph-node-tracked [graph node]
   (let [ast (.getAST node)
         map (take-while #(not= (:ast %) ast) (:int-to-int-list graph))
@@ -464,6 +504,10 @@
   "Same as with-last-change, except change is not exposed to the user."
   `(with-last-change [~current ~ast change#] 
      ~@goals))
+
+      
+        
+
 
 (defmacro step-changes [navigatable ?end [& bindings ] & goals]
   "Launches a Qwal Query over an IAG."

@@ -101,3 +101,34 @@
                   topo)]
     (apply max lengths)))
  
+
+(defn extend-solution [graph solution]
+  (let [not-applied-changes (remove (fn [x] (some #{x} solution)) (range (count (:changes graph))))
+        no-dependencies (filter (fn [c]
+                                  (clojure.set/subset?
+                                    (set (nth (:dependencies graph) c))
+                                    solution))
+                          not-applied-changes)]
+    (map #(conj solution %) no-dependencies)))
+
+(defn comb [k added graph solutions]
+  (cond
+    (= k 0) solutions
+    (= added 0) (recur (dec k) (inc added) graph (map set (map vector (:roots graph))))
+    :else 
+    (let
+      [new-solutions (mapcat #(extend-solution graph %) solutions)
+       unique (distinct new-solutions)]
+      (recur (dec k) (inc added) graph unique))))
+
+
+(defn all-subset-changes [nav-graph]
+  (apply concat
+         (for [x (range 1 (inc (count (:changes nav-graph))))]
+           (map #(into #{} %) (comb x 0 nav-graph nil)))))
+
+
+(defn solution-ordered [graph solution]
+  (let [top-sort (topo-sort-graph graph)
+        changes (filter (fn [x] (some #{x} solution)) top-sort)]
+    changes))

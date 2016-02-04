@@ -72,10 +72,16 @@
   (first
     (graph/predecessors refactored-version)))
 
-(def projects
+
+(def ant-projects
   (list
-   ; ["07b710cc96c363b69d4e7225c96ffc0296354597" "34dc5127ac1a581305f7b89cc9801f1624b2e039" "Jar"]
-    ["821004a5407db28a7482cff8f928d92b7615ea36" "d97f4f390c59827af8a3bfe380c1bf7d4a4a84a9" "WeblogicDeploymentTool"]))
+   ["07b710cc96c363b69d4e7225c96ffc0296354597" "34dc5127ac1a581305f7b89cc9801f1624b2e039" "Jar"]
+   ["821004a5407db28a7482cff8f928d92b7615ea36" "d97f4f390c59827af8a3bfe380c1bf7d4a4a84a9" "WeblogicDeploymentTool"]))
+
+(def jmeter-projects
+  (list
+    ;["83c789314d92cc998b022447286c01debba9da97" "31ecdbb04d2bc04d4a64ec3274e1ff3fc32e8454" "JMeterUtils"]
+    ["43dfc6ac77fb1ce03b948eb854bae04699605dc3" "b57a7b3a8656073c9052d44883b7cc6915daa917" "AuthPanel"]))
 
 (defn field|introduced [left right ?field]
   (logic/fresh [?name ?other ?other-name ?fragment ?other-fragment]
@@ -129,7 +135,7 @@
         (literal-value ?literal ?str)
         (jdt/ast-parent+ ?literal ?left-method)
         (jdt/ast :MethodDeclaration ?left-method))
-      nav/change==>*
+      nav/change!=>*
       (nav/in-current-change-state [curr ast]
         (field|introduced ?not-present ast ?field)
         (ast/method-cu-method-cu|corresponding ?left-method ?not-present ?right-method ast)
@@ -262,3 +268,59 @@
        ;     (literal-value ?new-literal ?str)))))))
         ))))
         
+(defn minimize-solution [graph end-state f]
+  (defn validate-changes [solution]
+    (let [ordered (qwalkeko.clj.graph-algo/solution-ordered graph solution)
+          real-changes (map #(nth (:changes graph) %) ordered)
+          new-graph (reduce
+                      nav/change-apply
+                      graph
+                      real-changes)]
+      (f new-graph)))
+  (defn select-changes [applied-ids solution]
+    (if (empty? applied-ids)
+      solution
+      (let [remove-id (first applied-ids)
+            dependencies (conj (nav/graph-change-dependents-recursive graph remove-id) remove-id)
+            new-solution (remove (fn [x] (some #{x} dependencies)) solution)
+            new-applied (remove (fn [x] (some #{x} dependencies)) applied-ids)]
+        (if (validate-changes new-solution) ;;we can remove that change and its dependencies
+          (recur new-applied new-solution)
+          (recur (rest applied-ids) solution)))))
+  (let [applied-ids (filter #(nth (:applied end-state) %) (range (count (:changes end-state))))]
+    (select-changes applied-ids applied-ids)))
+
+
+(defn magic-constant-checker [graph]
+  (let [left (:left graph)
+        curr (first (:asts graph))]
+  (not 
+    (empty?
+      (logic/run 1 [?field]
+          (logic/fresh 
+            [?left-method ?literal ?str
+             ?right-method ?fragment ?init ?field-name ?field-access
+             ?new-literal]
+            (ast/child+-iter left ?literal)
+            (literal-value ?literal ?str)
+            (jdt/ast-parent+ ?literal ?left-method)
+            (jdt/ast :MethodDeclaration ?left-method)
+            (field|introduced left curr ?field)
+            ;;right part
+            (ast/method-cu-method-cu|corresponding ?left-method left ?right-method curr)
+            (jdt/child :fragments ?field ?fragment)
+            (jdt/has :initializer ?fragment ?init)
+            (literal-value ?init ?str)
+            (jdt/has :name ?fragment ?field-name)
+            (jdt/child+ ?right-method ?field-access)
+            (jdt/ast :SimpleName ?field-access)
+            (jdt/name|simple-name|simple|same ?field-name ?field-access)))))))
+
+
+(defn field-introduced-checker [graph]
+  (let [left (:left graph)
+        curr (first (:asts graph))]
+    (not
+      (empty?
+        (logic/run 1 [?field]
+          (field|introduced left curr ?field))))))

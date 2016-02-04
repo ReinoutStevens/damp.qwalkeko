@@ -288,6 +288,31 @@
     navigatable))
 
 
+(defn graph-change-dependencies-recursive [graph idx]
+  (defn with-visited [visited idx]
+    (if (some #{idx} visited)
+      visited
+      (let [deps (nth (:dependencies graph) idx)
+            new-visited (conj visited idx)]
+        (reduce
+          with-visited
+          new-visited
+          deps))))
+  (disj (with-visited #{} idx) idx))
+
+
+(defn graph-change-dependents-recursive [graph idx]
+  (defn with-visited [visited idx]
+    (if (some #{idx} visited)
+      visited
+      (let [deps (nth (:dependents graph) idx)
+            new-visited (conj visited idx)]
+        (reduce
+          with-visited
+          new-visited
+          deps))))
+  (disj (with-visited #{} idx) idx))
+
 ;;Qwal that shit
 (defn graph-change-applied? [graph idx]
   (nth (:applied graph) idx))
@@ -504,10 +529,6 @@
   "Same as with-last-change, except change is not exposed to the user."
   `(with-last-change [~current ~ast change#] 
      ~@goals))
-
-      
-        
-
 
 (defmacro step-changes [navigatable ?end [& bindings ] & goals]
   "Launches a Qwal Query over an IAG."

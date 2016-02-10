@@ -146,12 +146,18 @@
     (java-change-apply new-graph new-move (:graph-idx change))))
 
 (defmethod change-apply qwalkeko.clj.functionalnodes.CListMove [graph change]
+  (defn number-of-deletes []
+    (let [parents (take-while #(not (nil? %)) (iterate #(nth (:parent graph) %) 
+                                                (nth (:parent graph) (:graph-idx change))))
+          changes (map #(nth (:changes graph) %) parents)
+          deletes (filter #(= (:operation %) :delete) changes)]
+      (count deletes)))
   (let [new-graph (graph-prepare-for-change graph)
         prop (:property change)
         lparent (:left-parent change)
         lnode (:copy change)
         mnode (graph-corresponding-node-latest-ast new-graph lnode)
-        rnode (nth (seq (qwalkeko.clj.ast/has-clj-unwrapped prop lparent)) (:index change))
+        rnode (nth (seq (qwalkeko.clj.ast/has-clj-unwrapped prop lparent)) (- (:index change) (number-of-deletes)))
         mlparent (graph-corresponding-node-latest-ast new-graph lparent)
         index  (graph-change-current-index graph (changes/graph-change-parent graph change) (:index change))
         new-move (new Move nil mnode mlparent rnode 

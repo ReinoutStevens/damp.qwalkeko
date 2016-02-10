@@ -76,12 +76,14 @@
 (def ant-projects
   (list
    ["07b710cc96c363b69d4e7225c96ffc0296354597" "34dc5127ac1a581305f7b89cc9801f1624b2e039" "Jar"]
-   ["821004a5407db28a7482cff8f928d92b7615ea36" "d97f4f390c59827af8a3bfe380c1bf7d4a4a84a9" "WeblogicDeploymentTool"]))
+   ["821004a5407db28a7482cff8f928d92b7615ea36" "d97f4f390c59827af8a3bfe380c1bf7d4a4a84a9" "WeblogicDeploymentTool"]
+   ["6231c77d24ce79d308b50e46097851fa8dc63e93" "a794b2b204995a03c2e3c117ff2c4749710e6840" "FixCRLF"]))
 
 (def jmeter-projects
   (list
     ;["83c789314d92cc998b022447286c01debba9da97" "31ecdbb04d2bc04d4a64ec3274e1ff3fc32e8454" "JMeterUtils"]
-    ["43dfc6ac77fb1ce03b948eb854bae04699605dc3" "b57a7b3a8656073c9052d44883b7cc6915daa917" "AuthPanel"]))
+    ["43dfc6ac77fb1ce03b948eb854bae04699605dc3" "b57a7b3a8656073c9052d44883b7cc6915daa917" "AuthPanel"]
+    ["50b60b298ae941baf40709fa3d32f4eae1117936" "3a53a0a6ed2a1aba7c15bcdc8fae997c73644b60" "HTTPSampler"]))
 
 (defn field|introduced [left right ?field]
   (logic/fresh [?name ?other ?other-name ?fragment ?other-fragment]

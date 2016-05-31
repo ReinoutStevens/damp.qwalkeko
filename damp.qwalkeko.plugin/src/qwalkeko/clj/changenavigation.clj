@@ -157,7 +157,8 @@
         lparent (:left-parent change)
         lnode (:copy change)
         mnode (graph-corresponding-node-latest-ast new-graph lnode)
-        rnode (nth (seq (qwalkeko.clj.ast/has-clj-unwrapped prop lparent)) (- (:index change) (number-of-deletes)))
+        ;rnode (nth (seq (qwalkeko.clj.ast/has-clj-unwrapped prop lparent)) (- (:index change) (number-of-deletes)))
+        rnode (:copy change) ;(nth (.indexOf (seq (qwalkeko.clj.ast/has-clj-unwrapped prop lparent)) (:copy change)))
         mlparent (graph-corresponding-node-latest-ast new-graph lparent)
         index  (graph-change-current-index graph (changes/graph-change-parent graph change) (:index change))
         new-move (new Move nil mnode mlparent rnode 

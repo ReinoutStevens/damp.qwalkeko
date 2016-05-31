@@ -59,9 +59,9 @@
   clojure.core.logic.protocols/IUninitialized
   (-uninitialized [_] (CListDelete. :delete nil nil nil nil nil nil nil)))
 
-(defrecord CListMove [operation original copy left-parent right-parent property index graph-idx prime-parent]
+(defrecord CListMove [operation original copy left-parent right-parent property index graph-idx prime-parent prime-idx prime-property]
   clojure.core.logic.protocols/IUninitialized
-  (-uninitialized [_] (CListMove. :move nil nil nil nil nil nil nil nil)))
+  (-uninitialized [_] (CListMove. :move nil nil nil nil nil nil nil nil nil nil)))
 
 (defrecord CListInsert [operation original copy left-parent right-parent property index graph-idx]
   clojure.core.logic.protocols/IUninitialized
@@ -126,7 +126,9 @@
            :property prop
            :index idx
            :graph-idx nil
-           :prime-parent (.getLeftPrimeParent operation)}]
+           :prime-parent (.getLeftPrimeParent operation)
+           :prime-property (.getPrimeProperty operation)
+           :prime-idx (convert-index (.getPrimeIndex operation))}]
     (if idx
       (map->CListMove m)
       (map->CMove m))))
@@ -259,6 +261,16 @@
       (let [deps (set (nth (:dependencies graph) change-idx))]
         (into deps
           (mapcat #(change-dependencies-idx-recursive graph % (conj visited change-idx)) deps))))))
+
+(defn change-dependents-idx-recursive 
+  ([graph change-idx]
+    (change-dependents-idx-recursive graph change-idx #{}))
+  ([graph change-idx visited]
+    (if (visited change-idx)
+      #{}
+      (let [deps (set (nth (:dependents graph) change-idx))]
+        (into deps
+          (mapcat #(change-dependents-idx-recursive graph % (conj visited change-idx)) deps))))))
  
 (defn change-child-idx [graph change]
   (nth (:child graph) (:graph-idx change)))
@@ -385,7 +397,15 @@
           (iterate #(.getParent %) (:copy move))))
       (some #(= (:left-removed depends) %) ;;move removes the part in which move resides
         (take-while #(not (nil? %)) 
-          (iterate #(.getParent %) (:prime-parent move)))))))
+          (iterate #(.getParent %) (:prime-parent move))))
+      (and 
+        (nil? (:prime-parent move))
+        (some #(= (:left-removed depends) %) 
+          (take-while #(not (nil? %)) 
+            (iterate #(.getParent %) (:copy move)))))
+      (and 
+        (= (:prime-parent move) (:left-parent depends)))))) ;;move is overwritten by depends, so move must be done first
+        ;(= (:property move) (:property depends)))))) ;;probably not 100% correct
     
 ;;an insert can overwrite part of the AST that still needs to be used by a move
 ;;if that insert operates somewhere above the move
@@ -631,7 +651,6 @@
           graph))
       graph
       moves)))
-     
 
 
 (defn remove-cycles [graph]
@@ -646,10 +665,34 @@
       remove-insert-move-cycles
       remove-move-cycles))
 
+(defn fix-list-indices [graph]
+  ;;listmoves result in unoutputted deletes
+  ;;as a result some operations have an incorrect index
+  ;;lets try to solve that
+  (defn fix-delete-index [graph delete moves]
+    (let [lparent (:left-parent delete)
+          candidate-moves (filter #(not (nil? (:prime-idx %))) 
+                            (filter #(= (:prime-property %) (:property delete))
+                              (filter #(= (:prime-parent %) lparent) moves))) ;;check property type
+          sorted-moves (sort-by :prime-idx candidate-moves)
+    ;      (map-indexed (fn [i el] (- (:prime-idx 
+          dependent-moves (filter #(< (:prime-idx %) (:index delete)) candidate-moves)]
+      (update-in graph [:changes]
+        (fn [changes]
+          (assoc changes (:graph-idx delete)
+            (assoc delete :index (- (:index delete) (count dependent-moves))))))))
+  (let [listmoves  (filter move? (:changes graph))
+        deletes (filter list-operation? (:changes graph))]
+    (reduce  #(fix-delete-index %1 %2 listmoves) graph deletes)))
+    
+    
+
+
 (defn create-dependency-graph [changes]
   (let [graph (changes->graph changes)]
     (->
       graph
+      ;fix-delete-indices
       change-link-direct-dependents
       link-list-dependents
       link-delete-dependents

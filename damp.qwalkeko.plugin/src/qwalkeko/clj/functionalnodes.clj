@@ -199,14 +199,18 @@
   (.difference differencer)
   differencer)
 
-(defn- get-operations [differencer]
+(defn get-operations [differencer]
   (seq (.getOperations differencer)))
 
-(defn- left-matching [differencer]
+(defn left-matching [differencer]
   (.getLeftMatching differencer))
 
-(defn- right-matching [differencer]
+(defn right-matching [differencer]
   (.getRightMatching differencer))
+
+(defn get-java-changes [left right]
+  (let [differencer (make-differencer left right)]
+    (get-operations (difference differencer))))
 
 (defn get-ast-changes [left-ast right-ast]
   (let [differencer (make-differencer left-ast right-ast)

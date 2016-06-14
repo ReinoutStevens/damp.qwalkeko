@@ -277,10 +277,8 @@
         name))))
 
 (defn ast-assignment? [ast]
-  (= (.getNodeType ast) org.eclipse.jdt.core.dom.ASTNode/ASSIGNMENT))
-
-(defn ast-simplename? [ast]
-  (= (.getNodeType ast) org.eclipse.jdt.core.dom.ASTNode/SIMPLE_NAME))
+  (when-not (nil? ast)
+    (= (.getNodeType ast) org.eclipse.jdt.core.dom.ASTNode/ASSIGNMENT)))
 
 (defn ast-driver? [ast]
   (when (ast-assignment? ast)
@@ -289,13 +287,16 @@
         (= (.getIdentifier lefthand) "driver")))))
   
 (defn ast-classinstancecreation? [x]
-  (= (.getNodeType x) org.eclipse.jdt.core.dom.ASTNode/CLASS_INSTANCE_CREATION))
+  (when-not (nil? x)
+    (= (.getNodeType x) org.eclipse.jdt.core.dom.ASTNode/CLASS_INSTANCE_CREATION)))
 
 (defn classinstancecreation-pageobject? [ast]
   (when (ast-classinstancecreation? ast)
-    (let [type (ast/has-clj-unwrapped :type ast)
-          name (.getIdentifier (ast/has-clj-unwrapped :name type))]
-      (.endsWith name "Page"))))
+    (let [type (ast/has-clj-unwrapped :type ast)]
+      (when-not (nil? type)
+        (let [name (ast/has-clj-unwrapped :name type)]
+          (when-not (nil? name)
+            (.endsWith (.getIdentifier name) "Page")))))))
 
 (defn classify-assert [change]
   (let [affected (change-get-affected-nodes change)]
@@ -402,7 +403,10 @@
           (process-file [commit parent file]
             (let [left (get-compilation-unit (project-name parent) file)
                   right (get-compilation-unit (project-name commit) file)
-                  changes (changes/get-java-changes left right)
+                  changes 
+                  (try 
+                    (changes/get-java-changes left right)
+                    (catch Exception e '()))
                   classified (map classify-change changes)
                   partitioned (remove #(empty? (second %)) (partition 2 (interleave changes classified)))]
               [changes partitioned]))
@@ -419,13 +423,13 @@
                 (map
                   (fn [[changes interleaved file]]
                     (add-change-result repo commit file changes interleaved))
-                  results)))))])
-       (let [preds (get-parents repo walker commit)]
-         (doall
-           (map #(process-commit-parent commit %) preds))
-         (doall
-           (map #(delete-commit repo %) preds))
-         (delete-commit repo commit)))]
+                  results)))))]
+         (let [preds (get-parents repo walker commit)]
+           (doall
+             (map #(process-commit-parent commit %) preds))
+           (doall
+             (map #(delete-commit repo %) preds))
+           (delete-commit repo commit))))]
     (let [walker (get-walker repo)]
       (doall
         (map

@@ -23,7 +23,7 @@
   (:import [org.eclipse.jgit.storage.file FileRepositoryBuilder])
   (:import [org.eclipse.jdt.core.dom ASTNode]))
 
-(def +db-path+ "/Users/resteven/Documents/PhD/selenium.db")
+(def +db-path+ "/home/resteven/selenium.db")
 (def +db-specs+ {:classname "org.sqlite.JDBC",
                  :subprotocol "sqlite"
                  :subname +db-path+})
@@ -430,3 +430,8 @@
         (fn [commit]
           (process-commit-changes repo walker commit))
         (seq walker)))))
+
+(defn classify-changes-location [location]
+  (let [repo (read-git-repo location)]
+    (time
+      (classify-all-changes repo))))

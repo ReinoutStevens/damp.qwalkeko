@@ -69,25 +69,25 @@
 
 
 (defn process-file [eclipse file]
-  (defn qualified-name-to-str [res name]
-    (if (.isSimpleName name)
-      (conj res name)
-      (recur (conj res (ast/has-clj-unwrapped :name name)) (ast/has-clj-unwrapped :qualifier name))))
-  (defn contains-selenium-import? [cu]
-    (let [imports (ast/has-clj-unwrapped :imports cu)]
-      (some
-        (fn [import]
-          (let [qualname (ast/has-clj-unwrapped :name import)
-                names (qualified-name-to-str '() qualname)
-                ids (map #(ast/has-clj-unwrapped :identifier %) names)]
-            (some
-              #{"selenium"}
-              ids)))
-        imports)))
+  (letfn [(qualified-name-to-str [res name]
+            (if (.isSimpleName name)
+              (conj res name)
+              (recur (conj res (ast/has-clj-unwrapped :name name)) (ast/has-clj-unwrapped :qualifier name))))
+          (contains-selenium-import? [cu]
+            (let [imports (ast/has-clj-unwrapped :imports cu)]
+              (some
+                (fn [import]
+                  (let [qualname (ast/has-clj-unwrapped :name import)
+                        names (qualified-name-to-str '() qualname)
+                        ids (map #(ast/has-clj-unwrapped :identifier %) names)]
+                    (some
+                      #{"selenium"}
+                      ids)))
+                imports)))]
   (let [cu (get-compilation-unit eclipse file)]
     (when (contains-selenium-import? cu)
       {:loc (count-lines cu)
-       :file file})))
+       :file file}))))
         
 (defn get-parents [repo walker commit]
  (let [parsed (.parseCommit walker (.getId commit))]
@@ -394,42 +394,44 @@
   (add-classified-changes repo commit file classified))
 
 (defn classify-all-changes [repo]
-  (defn process-commit-changes [repo walker commit]
-    (defn project-name [commit]
-      (str (repo-name repo) "-" (commit-id commit)))
-    (defn process-file [commit parent file]
-      (let [left (get-compilation-unit (project-name parent) file)
-            right (get-compilation-unit (project-name commit) file)
-            changes (changes/get-java-changes left right)
-            classified (map classify-change changes)
-            partitioned (remove #(empty? (second %)) (partition 2 (interleave changes classified)))]
-        [changes partitioned]))
-    (defn process-commit-parent [commit prev]
-      (let [modified-files (filter diffentry-modified? (get-modified-files-parent repo walker commit prev))
-            seleniums (filter is-selenium-file? (map get-path modified-files))]
-        (when (not (empty? seleniums))
-          (checkout-commit repo commit)
-          (checkout-commit repo prev))
-        (let [results (map
-                        (fn [file]
-                          (conj (process-file commit prev file) file)) seleniums)]
-        (doall
-          (map
-            (fn [[changes interleaved file]]
-              (add-change-result repo commit file changes interleaved))
-            results)))))
-     (let [preds (get-parents repo walker commit)]
-       (doall
-         (map #(process-commit-parent commit %) preds))
-       (doall
-         (map #(delete-commit repo %) preds))
-       (delete-commit repo commit)))
-  (let [walker (get-walker repo)]
-    (doall
-      (map
-        (fn [commit]
-          (process-commit-changes repo walker commit))
-        (seq walker)))))
+  (letfn 
+    [(process-commit-changes [repo walker commit]
+       (letfn 
+         [(project-name [commit]
+            (str (repo-name repo) "-" (commit-id commit)))
+          (process-file [commit parent file]
+            (let [left (get-compilation-unit (project-name parent) file)
+                  right (get-compilation-unit (project-name commit) file)
+                  changes (changes/get-java-changes left right)
+                  classified (map classify-change changes)
+                  partitioned (remove #(empty? (second %)) (partition 2 (interleave changes classified)))]
+              [changes partitioned]))
+          (process-commit-parent [commit prev]
+            (let [modified-files (filter diffentry-modified? (get-modified-files-parent repo walker commit prev))
+                  seleniums (filter is-selenium-file? (map get-path modified-files))]
+              (when (not (empty? seleniums))
+                (checkout-commit repo commit)
+                (checkout-commit repo prev))
+              (let [results (map
+                              (fn [file]
+                                (conj (process-file commit prev file) file)) seleniums)]
+              (doall
+                (map
+                  (fn [[changes interleaved file]]
+                    (add-change-result repo commit file changes interleaved))
+                  results)))))])
+       (let [preds (get-parents repo walker commit)]
+         (doall
+           (map #(process-commit-parent commit %) preds))
+         (doall
+           (map #(delete-commit repo %) preds))
+         (delete-commit repo commit)))]
+    (let [walker (get-walker repo)]
+      (doall
+        (map
+          (fn [commit]
+            (process-commit-changes repo walker commit))
+          (seq walker))))))
 
 (defn classify-changes-location [location]
   (let [repo (read-git-repo location)]

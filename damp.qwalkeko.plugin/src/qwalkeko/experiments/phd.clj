@@ -28,32 +28,6 @@
                  :subprotocol "sqlite"
                  :subname +db-path+})
 
-
-(def left
-  (damp.ekeko/ekeko 1 [?left]
-            (l/in-source-code [c]
-              (jdt/ast :TypeDeclaration ?type)
-              (jdt/has :name ?type ?name)
-              (jdt/name|simple-string ?name "Test")
-              (jdt/ast-typedeclaration|encompassing ?type ?left))))
-
-(def right
-  (damp.ekeko/ekeko 1 [?right]
-            (l/in-source-code [c]
-              (jdt/ast :TypeDeclaration ?type)
-              (jdt/has :name ?type ?name)
-              (jdt/name|simple-string ?name "Test2")
-              (jdt/ast-typedeclaration|encompassing ?type ?right))))
-
-
-
-
-;;selenium shizzle
-(def a-model (first (damp.ekeko.ekekomodel/all-project-models)))
-(def a-graph (graph/convert-model-to-graph a-model))
-(def a-root (first (:roots a-graph)))
-
-
 ;;selenium with clojure
 ;;temporal part
 (defn checkout-commit [repo rev-commit]
@@ -193,10 +167,6 @@
 
 
 ;;clojure change classification
-
-
-
-
 (defn node-get-parent-nodes [node]
   (take-while #(not (nil? %)) 
     (iterate #(.getParent %) node)))

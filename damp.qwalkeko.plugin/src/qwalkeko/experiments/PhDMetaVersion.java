@@ -28,7 +28,7 @@ public class PhDMetaVersion {
 	String gitRepo;
 	private IProject eclipseProject;
 
-	
+
 	public PhDMetaVersion(RevCommit revCommit, String gitRepo) {
 		this.revCommit = revCommit;
 		this.gitRepo = gitRepo;
@@ -37,7 +37,7 @@ public class PhDMetaVersion {
 	private String getVersionRepositoryLocation(){
 		return gitRepo + "-" + getRevisionNumber();
 	}
-	
+
 	public void openAndCheckoutIfNeeded() throws CoreException{
 		File root = ResourcesPlugin.getWorkspace().getRoot().getLocation().toFile();
 		File targetLocation = new File(root, getVersionRepositoryLocation());
@@ -57,7 +57,7 @@ public class PhDMetaVersion {
 			createEclipseMetaProject();
 		}
 	}
-	
+
 	public void closeAndDeleteIfNeeded() throws CoreException{
 		if(eclipseProject == null){
 			String loc = getVersionRepositoryLocation();
@@ -69,7 +69,7 @@ public class PhDMetaVersion {
 			eclipseProject = null;
 		}
 	}
-	
+
 	private void doCloneOperation(File sourceLocation, File targetLocation) throws IOException, InterruptedException{
 		assert(sourceLocation.exists());
 		assert(!targetLocation.exists());
@@ -79,11 +79,11 @@ public class PhDMetaVersion {
 			assert(false);
 		}
 	}
-	
+
 	private String getRevisionNumber(){
 		return ObjectId.toString(revCommit.getId());
 	}
-	
+
 	private void doCheckoutOperation() throws IOException, InterruptedException{
 		/*(Repository repo = versionRepository.getRepository();
 		ObjectId head = repo.resolve(Constants.HEAD);
@@ -96,7 +96,7 @@ public class PhDMetaVersion {
 			}
 		}
 		versionRepository.checkout().setStartPoint(commit).setAllPaths(true).call();
-		*/
+		 */
 		File root = ResourcesPlugin.getWorkspace().getRoot().getLocation().toFile();
 		File targetLocation = new File(root, getVersionRepositoryLocation());
 		String[] cmd = { GitCommands.gitCommand(), "checkout", getRevisionNumber() };
@@ -105,7 +105,7 @@ public class PhDMetaVersion {
 			assert(false);
 		}
 	}
-	
+
 	private void createEclipseMetaProject(){
 		String loc = getVersionRepositoryLocation();
 		eclipseProject = ResourcesPlugin.getWorkspace().getRoot().getProject(loc);
@@ -144,17 +144,17 @@ public class PhDMetaVersion {
 		File gitLocation = new File(targetLocation, ".git");
 		deleteDir(gitLocation);
 	}
-	
+
 	private boolean deleteDir(File dir) { 
-		  if (dir.isDirectory()) { 
-			  String[] children = dir.list(); 
-			  for (int i=0; i<children.length; i++) { 
-				  boolean success = deleteDir(new File(dir, children[i])); 
-				  if (!success) {  
-					  return false; 
-				  } 
-			  }
-		  }	
-		  return dir.delete(); 
-		}
+		if (dir.isDirectory()) { 
+			String[] children = dir.list(); 
+			for (int i=0; i<children.length; i++) { 
+				boolean success = deleteDir(new File(dir, children[i])); 
+				if (!success) {  
+					return false; 
+				} 
+			}
+		}	
+		return dir.delete(); 
+	}
 }

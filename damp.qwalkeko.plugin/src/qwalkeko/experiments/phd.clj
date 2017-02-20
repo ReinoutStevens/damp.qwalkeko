@@ -67,27 +67,29 @@
 (defn count-lines [ast]
   (count (clojure.string/split-lines (.toString ast))))
 
+(defn split-qualified-name 
+  ([name]
+    (split-qualified-name name '()))
+  ([name res]
+    (if (.isSimpleName name)
+      (conj res name)
+      (recur (ast/has-clj-unwrapped :qualifier name) (conj res (ast/has-clj-unwrapped :name name))))))
+
+(defn cu-contains-selenium? [cu]
+  (let [imports (ast/has-clj-unwrapped :imports cu)]
+    (some
+      (fn [import]
+        (let [qualname (ast/has-clj-unwrapped :name import)
+              names (split-qualified-name qualname)
+              ids (map #(ast/has-clj-unwrapped :identifier %) names)]
+          (some
+            #{"selenium"}
+            ids))))))
 
 (defn process-file [eclipse file]
-  (letfn [(qualified-name-to-str [res name]
-            (if (.isSimpleName name)
-              (conj res name)
-              (recur (conj res (ast/has-clj-unwrapped :name name)) (ast/has-clj-unwrapped :qualifier name))))
-          (contains-selenium-import? [cu]
-            (let [imports (ast/has-clj-unwrapped :imports cu)]
-              (some
-                (fn [import]
-                  (let [qualname (ast/has-clj-unwrapped :name import)
-                        names (qualified-name-to-str '() qualname)
-                        ids (map #(ast/has-clj-unwrapped :identifier %) names)]
-                    (some
-                      #{"selenium"}
-                      ids)))
-                imports)))]
   (let [cu (get-compilation-unit eclipse file)]
     (when (contains-selenium-import? cu)
-      {:loc (count-lines cu)
-       :file file}))))
+      [file (count-lines cu)])))
         
 (defn get-parents [repo walker commit]
  (let [parsed (.parseCommit walker (.getId commit))]
@@ -156,7 +158,7 @@
       (when-not (empty? java-files)
         (delete-commit repo commit))
       (doall
-        (map (fn [result] (add-changed-file repo commit (:file result) (:loc result))) results))
+        (map (fn [[file loc]] (add-changed-file repo commit file loc)) results))
       results)))
 
 (defn process-repo [location]
@@ -207,10 +209,6 @@
     (.getNodeType ast)))
   
 
-(defn ast-assert? [node]
-  (when-not (nil? node)
-    (= (.getNodeType node) org.eclipse.jdt.core.dom.ASTNode/ASSERT_STATEMENT)))
-
 (defn ast-markerannotation? [node]
   (when-not (nil? node)
     (= (.getNodeType node) org.eclipse.jdt.core.dom.ASTNode/MARKER_ANNOTATION)))
@@ -223,6 +221,13 @@
   (when-not (nil? node)
     (= (.getNodeType node) org.eclipse.jdt.core.dom.ASTNode/METHOD_INVOCATION)))
 
+
+(defn methodinvocation-assert? [node]
+  (when (ast-methodinvocation? node)
+    (let [name (ast/has-clj-unwrapped :name node)
+          val (.getIdentifier name)]
+      (.startsWith val "assert"))))
+
 (defn ast-simplename? [node]
   (when-not (nil? node)
     (= (.getNodeType node) org.eclipse.jdt.core.dom.ASTNode/SIMPLE_NAME)))
@@ -231,7 +236,7 @@
   (when (ast-methodinvocation? node)
     (let [exp (ast/has-clj-unwrapped :expression node)]
       (when (ast-simplename? exp)
-        (= (.getIdentifier exp) "FindBy")))))
+        (= (.getIdentifier exp) "By")))))
 
 (defn annotation-findby? [node]
   (when (ast-normalannotation? node)
@@ -293,14 +298,12 @@
 (defn classinstancecreation-pageobject? [ast]
   (when (ast-classinstancecreation? ast)
     (let [type (ast/has-clj-unwrapped :type ast)]
-      (when-not (nil? type)
-        (let [name (ast/has-clj-unwrapped :name type)]
-          (when-not (nil? name)
-            (.endsWith (.getIdentifier name) "Page")))))))
+      (when-let [name (ast/has-clj-unwrapped :name type)]
+        (.endsWith (.getIdentifier name) "Page")))))
 
 (defn classify-assert [change]
   (let [affected (change-get-affected-nodes change)]
-    (some ast-assert? affected)))
+    (some methodinvocation-assert? affected)))
 
 (defn classify-findby [change]
   (let [affected (change-get-affected-nodes change)]
@@ -316,8 +319,11 @@
 
 (defn classify-constantupdate [change]
   (when (.isUpdate change)
-    (let [affected (change-get-affected-nodes change)]
-      (some ast-constant? affected))))
+    (let [original (.getOriginal change)
+          newvalue (.getRightValue change)]
+      (and
+        (ast-constant? original)
+        (ast-constant? newvalue)))))
 
 (defn classify-driver [change]
   (let [affected (change-get-affected-nodes change)]

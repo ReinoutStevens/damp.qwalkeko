@@ -134,3 +134,38 @@
   (let [top-sort (topo-sort-graph graph)
         changes (filter (fn [x] (some #{x} solution)) top-sort)]
     changes))
+
+
+(defn graph-to-dot [graph & solutions]
+  (let [changes (range (count (:changes graph)))]
+    (letfn [(generate-header []
+              (str "digraph G {\n" "ratio=\"fill\";\n" "size=\"8.3,11.7!\";\n" "margin=0;\n" "node [label=\"\"];\n"))
+            (generate-node-color [n]
+              (let [op (:operation (nth (:changes graph) n))]
+                (cond
+                  (= op :insert) "orange"
+                  (= op :move) "blue"
+                  (= op :update) "grey"
+                  (= op :delete) "red")))
+            (generate-node-shape [n]
+              (if (some #{n} solutions) "pentagon" "circle"))
+            (generate-node-size [n]
+              (if (some #{n} solutions) "8" "2"))
+            (generate-nodes []
+              (apply str (map (fn [x] (str "  " x " [shape=" (generate-node-shape x) 
+                                        ",fixedsize=true, height=" (generate-node-size x)
+                                        ", width=" (generate-node-size x) ", style=filled, fillcolor=" 
+                                        (generate-node-color x) "];\n")) changes)))
+            (generate-edge [change]
+              (let [deps (nth (:dependents graph) change)]
+                (apply str (map (fn [d] (str "  " change " -> " d " [arrowsize=2] ;\n")) deps))))
+            (generate-edges []
+              (apply str (map generate-edge changes)))
+            (generate-footer []
+              "}")]
+  (with-open [o (clojure.java.io/writer "/Users/resteven/graph.dot")]
+    (.write o (generate-header))
+    (.write o (generate-nodes))
+    (.write o (generate-edges))
+    (.write o (generate-footer))))))
+    

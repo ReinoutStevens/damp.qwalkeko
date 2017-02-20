@@ -7,6 +7,7 @@
   (:require [damp.qwal :as qwal])
   (:require [qwalkeko.clj.graph :as graph])
   (:require [qwalkeko.clj.functionalnodes :as changes])
+  ;(:require [qwalkeko.clj.graph-algo :as algo])
   (:require [qwalkeko.clj.changenavigation :as nav])
   (:require [damp.ekeko.jdt
              [ast :as jdt]]))
@@ -393,7 +394,7 @@
   (logic/fresh [?name]
     (jdt/has :name ?method ?name)
     (el/fails
-      (logic/all [?invoc ?invocname]
+      (logic/fresh [?invoc ?invocname]
         (jdt/child+ ast ?invoc)
         (jdt/ast :MethodInvocation ?invoc)
         (jdt/has :name ?invoc ?invocname)

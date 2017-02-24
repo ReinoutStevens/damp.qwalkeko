@@ -19,9 +19,36 @@
 ;;Currently, the notion of graphs and nodes are mixed
 ;;A node is represented by the complete graph: it contains the path of applied changes and the ASTs along that path
 ;;This way we retrieve the AST corresponding with that node
-;;The implementation should be modified so there is a distinct notion between nodes and graphs
-;;so that information can be reused across nodes (like the AST of two nodes with different change paths, but that have the same change set)
 
+;Easy improvements
+;; When two permutations of the same subsequence (A->B-C, C->B->A) are applied they should end up in the intermediate state
+;; currently we construct the same AST twice
+
+;Terminology
+;; IAG -> Intermediate AST Graph, equivalent to ES in the paper
+
+;Graph information
+;; We have a functional implementation, meaning whenever we apply a change we create a new graph
+;; This graph has an additional ES that is the result of applying that change
+;; A graph may not be the best name as it is more a single path through the conceptual ESG
+
+;Change Application
+;;Changes are represented using nodes from either source, source' or target
+;;We need a way to know to what nodes of the current AST the source' nodes used in changes correspond with
+;;Initially we have a hashmap that starts with the original mapping going from source' to source, provided by changenodes
+;;Whenever we apply a change we create a copy of the current AST and its mapping, and update the mapping based on the effect
+;;of the change. This update is performed by changenodes itself as changes take this mapping as an argument
+
+; Variables (written 1year of writing the code, not 100% sure :p )
+;; asts -> a list of ASTs that contain the different intermediate ASTs of the path. The first element is the latest AST
+;; applied -> vector with booleans stating which changes have been applied (I guess a list with the order may be better)
+;; prime-to-int-map -> a sequence of maps of source' to intermediate ASTs. Same ordering as asts field
+;; dependencies -> vector that models the dependencies of change i 
+;;    at index i we find all the changes that must be applied before we can apply change i
+;; dependents -> inverse of dependencies
+;;    at index i we find all the changes that cannot be applied before change i is applied
+;; parents -> vector containing the list dependencies
+;; roots -> changes without any dependencies
 
 ;;applying changes
 (defn- link-sequences [left-seq copy-seq]
@@ -95,8 +122,6 @@
         ast-map (get (:prime-to-int-map graph) (.getAST new-ast))
         int-list (:map (first (:int-to-int-list graph)))
         hash-map (java.util.HashMap. ast-map)]
-;    (binding [*out* *err*]
-;      (println idx))   
     (.apply jchange (java.util.HashMap.) hash-map)
     (-> graph 
       (assoc :prime-to-int-map (assoc (:prime-to-int-map graph) (.getAST new-ast) (into {} hash-map)))
@@ -296,29 +321,29 @@
 
 
 (defn graph-change-dependencies-recursive [graph idx]
-  (defn with-visited [visited idx]
-    (if (some #{idx} visited)
-      visited
-      (let [deps (nth (:dependencies graph) idx)
-            new-visited (conj visited idx)]
-        (reduce
-          with-visited
-          new-visited
-          deps))))
-  (disj (with-visited #{} idx) idx))
+  (letfn [(with-visited [visited idx]
+            (if (some #{idx} visited)
+              visited
+              (let [deps (nth (:dependencies graph) idx)
+                    new-visited (conj visited idx)]
+                (reduce
+                  with-visited
+                  new-visited
+                  deps))))]
+    (disj (with-visited #{} idx) idx)))
 
 
 (defn graph-change-dependents-recursive [graph idx]
-  (defn with-visited [visited idx]
-    (if (some #{idx} visited)
-      visited
-      (let [deps (nth (:dependents graph) idx)
-            new-visited (conj visited idx)]
-        (reduce
-          with-visited
-          new-visited
-          deps))))
-  (disj (with-visited #{} idx) idx))
+  (letfn [(with-visited [visited idx]
+            (if (some #{idx} visited)
+              visited
+              (let [deps (nth (:dependents graph) idx)
+                    new-visited (conj visited idx)]
+                (reduce
+                  with-visited
+                  new-visited
+                  deps))))]
+    (disj (with-visited #{} idx) idx)))
 
 ;;Qwal that shit
 (defn graph-change-applied? [graph idx]
@@ -466,43 +491,44 @@
     (change!=>* g ?neext ?next)))
 
 (defn change-limit=> [limit]
-  (defn limit-inner [g current ?next]
-    (logic/conda
-      [(logic/== true (< limit (count (filter true? (:applied current)))))
-       logic/fail]
-      [logic/succeed
-       (logic/conde
-         [(logic/fresh [?neext]
-            (change==> g current ?neext)
-            (limit-inner g ?neext ?next))]
-         [(logic/== current ?next)])]))
-  limit-inner)
+  (letfn [(limit-inner [g current ?next]
+            (logic/conda
+              [(logic/== true (< limit (count (filter true? (:applied current)))))
+               logic/fail]
+              [logic/succeed
+               (logic/conde
+                 [(logic/fresh [?neext]
+                    (change==> g current ?neext)
+                    (limit-inner g ?neext ?next))]
+                 [(logic/== current ?next)])]))]
+    limit-inner))
       
 (defn change-limit-> [limit]
-  (defn limit-inner [g current ?next]
-    (logic/conda
-      [(logic/== true (< limit (count (filter true? (:applied current)))))
-       logic/fail]
-      [logic/succeed
-       (logic/conde
-         [(logic/fresh [?neext]
-            (change-> g current ?neext)
-            (limit-inner g ?neext ?next))]
-         [(logic/== current ?next)])]))
-  limit-inner)
+  (letfn [(limit-inner [g current ?next]
+            (logic/conda
+              [(logic/== true (< limit (count (filter true? (:applied current)))))
+               logic/fail]
+              [logic/succeed
+               (logic/conde
+                 [(logic/fresh [?neext]
+                    (change-> g current ?neext)
+                    (limit-inner g ?neext ?next))]
+                 [(logic/== current ?next)])]))]
+  limit-inner))
       
 (defn change-sol-> [solution]
-  (defn do-solution-magic [graph changes]
-    (let [real-changes (map #(nth (:changes graph) %) changes)]
-      (reduce
-        change-apply
-        graph
-        real-changes)))
-  (fn [graph current next]
-    (logic/project [solution]
-      (logic/== next (do-solution-magic current solution)))))
+  (letfn [(do-solution-magic [graph changes]
+            (let [real-changes (map #(nth (:changes graph) %) changes)]
+              (reduce
+                change-apply
+                graph
+                real-changes)))]
+    (fn [graph current next]
+      (logic/project [solution]
+        (logic/== next (do-solution-magic current solution))))))
 
 (defn graph-node-tracked [graph node]
+  "finds the corresponding node of node (from a previous AST) in the current AST of graph"
   (let [ast (.getAST node)
         map (take-while #(not= (:ast %) ast) (:int-to-int-list graph))
         reversed (rest (reverse map))]

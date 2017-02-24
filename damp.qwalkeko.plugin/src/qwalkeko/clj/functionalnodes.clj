@@ -47,14 +47,6 @@
   clojure.core.logic.protocols/IUninitialized
   (-uninitialized [_] (CInsert. :insert nil nil nil nil nil nil nil nil)))
 
-(defrecord CMoveDelete [operation original left-parent property index move-idx graph-idx]
-  clojure.core.logic.protocols/IUninitialized
-  (-uninitialized [_] (CMoveDelete. :movedelete nil nil nil nil nil nil)))
-
-(defrecord CListMoveDelete [operation original left-parent property index move-idx graph-idx]
-  clojure.core.logic.protocols/IUninitialized
-  (-uninitialized [_] (CMoveDelete. :movedelete nil nil nil nil nil nil)))
-
 (defrecord CListDelete  [operation original copy property left-parent index  dependency graph-idx]
   clojure.core.logic.protocols/IUninitialized
   (-uninitialized [_] (CListDelete. :delete nil nil nil nil nil nil nil)))
@@ -149,47 +141,6 @@
 
 ;;Moves of mandatory properties need to have a delete as well
 (declare move? change-dependencies-idx-recursive)
-(defn root-moves-to-delete [graph]
-  (defn output-delete [move]
-    (let [m {:operation :movedelete
-             :original (:original move)
-             :left-parent (:left-parent move)
-             :property (:property move)
-             :index (:index move)
-             :move-idx (:graph-idx move)
-             :graph-idx nil}]
-      (if (:index m)
-        (map->CListMoveDelete m)
-        (map->CMoveDelete m))))
-  (let [moves (filter move? (:changes graph))
-        move-idx (map :graph-idx moves)
-        root-moves (remove #(some
-                              (fn [dep]
-                                (some #{dep} move-idx))
-                              (change-dependencies-idx-recursive graph %))
-                     move-idx)
-        deletes
-        (map output-delete (map #(nth (:changes graph) %) root-moves))
-        deletes-idx
-        (map-indexed
-          (fn [idx d]
-            (assoc d :graph-idx (+ (count (:changes graph)) idx)))
-          deletes)
-        new-changes
-        (assoc graph 
-          :changes (vec (concat (:changes graph) deletes-idx))
-          :dependents (vec (concat (:dependents graph) (repeat (count deletes-idx) nil)))
-          :dependencies (vec (concat (:dependencies graph) (repeat (count deletes-idx) nil))))]
-    (reduce
-      (fn [graph delete]
-        (let [parent-move (nth (:changes graph) (:move-idx delete))
-              dependencies (set (change-dependencies-idx-recursive graph (:graph-idx parent-move)))]
-          (update-in graph [:dependencies]
-            assoc (:graph-idx delete) dependencies)))
-      new-changes
-      deletes-idx)))
-    
-
 
 ;;Interface with Java Differencer
 (defn make-differencer [left-ast right-ast]
@@ -603,50 +554,49 @@
       bad-moves)))
 
 (defn- remove-move-cycles [graph]
-  (defn move->insert [move]
-    (let [m {:operation :insert
-             :graph-idx (:graph-idx move)
-             :original (:original move)
-             :copy (:copy move)
-             :left-parent (:left-parent move)
-             :right-parent (:right-parent move)
-             :property (:property move)
-             :index (:index move)
-             :left-removed (:left-removed move)}]
-      (if (:index move)
-        (map->CListInsert m)
-        (map->CInsert m))))
-  (defn fix-dependencies [graph new-insert]
-    (let [old-dependencies (nth (:dependencies graph) (:graph-idx new-insert))]
-      (reduce        
-        (fn [graph dep]
-          (if (change-change-dependent? graph dep new-insert)
-            graph
-            (change-remove-dependency graph dep new-insert)))
-        graph
-        (map #(nth (:changes graph) %) old-dependencies))))
-  (defn install-new-insert [graph new-insert]
-    (let [changes (:changes graph)
-          new-changes (assoc (:changes graph) (:graph-idx new-insert) new-insert)]
-      (assoc graph :changes new-changes)))
-  (defn bad-move? [graph move]
-    ((change-dependencies-idx-recursive graph (:graph-idx move))
-      (:graph-idx move)))
-  
-  (defn fix-bad-move [graph move]
-    (let [deps (change-dependencies-idx-recursive graph (:graph-idx move))
-          dep-moves (filter move? (map #(nth (:changes graph) %) deps))
-          dep-inserts (map move->insert dep-moves)
-          installed (reduce
-                      (fn [graph insert]
-                        (install-new-insert graph insert))
-                      graph
-                      dep-inserts)]
-      (reduce
-        (fn [graph insert]
-          (fix-dependencies graph insert))
-        installed
-        dep-inserts)))
+  (letfn [(move->insert [move]
+          (let [m {:operation :insert
+                   :graph-idx (:graph-idx move)
+                   :original (:original move)
+                   :copy (:copy move)
+                   :left-parent (:left-parent move)
+                   :right-parent (:right-parent move)
+                   :property (:property move)
+                   :index (:index move)
+                   :left-removed (:left-removed move)}]
+            (if (:index move)
+              (map->CListInsert m)
+              (map->CInsert m))))
+          (fix-dependencies [graph new-insert]
+            (let [old-dependencies (nth (:dependencies graph) (:graph-idx new-insert))]
+              (reduce        
+                (fn [graph dep]
+                  (if (change-change-dependent? graph dep new-insert)
+                    graph
+                    (change-remove-dependency graph dep new-insert)))
+                graph
+                (map #(nth (:changes graph) %) old-dependencies))))
+          (install-new-insert [graph new-insert]
+            (let [changes (:changes graph)
+                  new-changes (assoc (:changes graph) (:graph-idx new-insert) new-insert)]
+              (assoc graph :changes new-changes)))
+          (bad-move? [graph move]
+            ((change-dependencies-idx-recursive graph (:graph-idx move))
+              (:graph-idx move)))
+          (fix-bad-move [graph move]
+            (let [deps (change-dependencies-idx-recursive graph (:graph-idx move))
+                  dep-moves (filter move? (map #(nth (:changes graph) %) deps))
+                  dep-inserts (map move->insert dep-moves)
+                  installed (reduce
+                              (fn [graph insert]
+                                (install-new-insert graph insert))
+                              graph
+                              dep-inserts)]
+              (reduce
+                (fn [graph insert]
+                  (fix-dependencies graph insert))
+                installed
+                dep-inserts)))]
   (let [moves (filter move? (:changes graph))]
     (reduce
       (fn [graph move]
@@ -654,7 +604,7 @@
           (fix-bad-move graph move)
           graph))
       graph
-      moves)))
+      moves))))
 
 
 (defn remove-cycles [graph]
@@ -673,22 +623,21 @@
   ;;listmoves result in unoutputted deletes
   ;;as a result some operations have an incorrect index
   ;;lets try to solve that
-  (defn fix-delete-index [graph delete moves]
-    (let [lparent (:left-parent delete)
-          candidate-moves (filter #(not (nil? (:prime-idx %))) 
-                            (filter #(= (:prime-property %) (:property delete))
-                              (filter #(= (:prime-parent %) lparent) moves))) ;;check property type
-          sorted-moves (sort-by :prime-idx candidate-moves)
-    ;      (map-indexed (fn [i el] (- (:prime-idx 
-          dependent-moves (filter #(< (:prime-idx %) (:index delete)) candidate-moves)]
-      (update-in graph [:changes]
-        (fn [changes]
-          (assoc changes (:graph-idx delete)
-            (assoc delete :index (- (:index delete) (count dependent-moves))))))))
-  (let [listmoves  (filter move? (:changes graph))
-        deletes (filter list-operation? (:changes graph))]
-    (reduce  #(fix-delete-index %1 %2 listmoves) graph deletes)))
-    
+  (letfn [(fix-delete-index [graph delete moves]
+          (let [lparent (:left-parent delete)
+                candidate-moves (filter #(not (nil? (:prime-idx %))) 
+                                  (filter #(= (:prime-property %) (:property delete))
+                                    (filter #(= (:prime-parent %) lparent) moves))) ;;check property type
+                sorted-moves (sort-by :prime-idx candidate-moves)
+          ;      (map-indexed (fn [i el] (- (:prime-idx 
+                dependent-moves (filter #(< (:prime-idx %) (:index delete)) candidate-moves)]
+            (update-in graph [:changes]
+              (fn [changes]
+                (assoc changes (:graph-idx delete)
+                  (assoc delete :index (- (:index delete) (count dependent-moves))))))))]
+    (let [listmoves  (filter move? (:changes graph))
+          deletes (filter list-operation? (:changes graph))]
+      (reduce  #(fix-delete-index %1 %2 listmoves) graph deletes))))
     
 
 

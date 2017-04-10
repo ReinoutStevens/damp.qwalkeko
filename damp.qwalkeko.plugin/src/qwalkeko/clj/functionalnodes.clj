@@ -800,3 +800,8 @@
          (logic/project [?matching]
            (logic/project [?left]
              (logic/== ?right (get ?matching ?left))))]))))
+
+
+(defn ast-ast-changes [?left ?right ?changes]
+  (logic/project [?left ?right]
+    (logic/== ?changes (seq (get-ast-changes ?left ?right)))))

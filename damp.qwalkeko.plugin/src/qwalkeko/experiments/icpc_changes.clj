@@ -12,7 +12,7 @@
   (:require [damp.ekeko.jdt
              [ast :as jdt]]))
 
-
+;;File with the experiments of the SANER17 paper
 
 (def left
   (first
@@ -231,7 +231,11 @@
     (f pro)))
 
 (map #(compute-project field-introduced %) projects)
-    
+   
+(defn foo []
+  a
+  b
+  c)
    
 ;;field declaration inserted
 (logic/run 1 [?end]

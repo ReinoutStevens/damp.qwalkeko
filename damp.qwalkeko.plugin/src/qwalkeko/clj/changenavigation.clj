@@ -217,27 +217,6 @@
                      (astnode/node-property-descriptor-for-ekeko-keyword lparent prop))]
     (java-change-apply new-graph new-update (:graph-idx change))))
 
-(defmethod change-apply qwalkeko.clj.functionalnodes.CMoveDelete [graph change]
-  (let [new-graph (graph-prepare-for-change graph)
-        prop (:property change)
-        lparent (:left-parent change)
-        mlparent (graph-corresponding-node-latest-ast new-graph lparent)
-        mnode (qwalkeko.clj.ast/has-clj-unwrapped prop mlparent)
-        new-delete (new Delete nil mnode)]
-    (java-change-apply new-graph new-delete (:graph-idx change))))
-
-
-(defmethod change-apply qwalkeko.clj.functionalnodes.CListMoveDelete [graph change]
-  (let [new-graph (graph-prepare-for-change graph)
-        prop (:property change)
-        lparent (:left-parent change)
-        mlparent (graph-corresponding-node-latest-ast new-graph lparent)
-        jprop (prop (astnode/reifiers mlparent))
-        idx (graph-change-current-index graph (nth (:changes graph) (:move-idx change)) (:idx change))
-        mnode (nth (seq (.getStructuralProperty mlparent jprop)) idx)
-        new-delete (new Delete nil mnode)]
-    (java-change-apply new-graph new-delete (:graph-idx change))))
-
 
 
 (defmulti graph-change-convert-to-ast 

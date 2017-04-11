@@ -8,17 +8,37 @@
   (:require [damp.qwal :as qwal])
   (:require [qwalkeko.clj.graph :as graph])
   (:require [qwalkeko.clj.functionalnodes :as changes])
-  ;(:require [qwalkeko.clj.graph-algo :as algo])
   (:require [qwalkeko.clj.changenavigation :as nav])
   (:require [damp.ekeko.jdt
              [ast :as jdt]])
-  (:require [clojure.repl :as repl]))
+  (:require [clojure.repl :as repl])
+  (:require [clojure.string :as string])
+  (:require [clojure.java.shell :as shell]))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Setting up the projects locally ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defn clone-project
+  "Given a location to clone projects in and one GitHub project, clone the
+   project into the folder. Both are strings."
+  [project-folder userproject]
+  (let [user (first (string/split userproject #"/"))
+        project (second (string/split userproject #"/"))
+        ghlink (str "https://github.com/" user "/" project)
+        clone-folder (str project-folder "/" user "-" project)]
+    (shell/sh "git" "clone" "-q" ghlink clone-folder)))
+
+(defn clone-projects
+  "Given a location to clone projects in and a file with one GitHub project per
+   line, clone every project into the folder. Both arguments are strings."
+  [dll-folder info-file]
+  (let [projects (string/split-lines (slurp info-file))]
+    (map #(clone-project dll-folder %) projects)))
 
 
-;;Folder met al de projecten
-(def PROJECT_FOLDER "/Users/ward/Documents/phd/paper-mergeerrorpatterns/projects")
-
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Importing projects in Eclipse ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn is-git-folder
   "Check whether a given File object is a .git folder"
   [folder]
@@ -35,10 +55,6 @@
         projects-git (flatten (map #(filter is-git-folder %) projects-subfolders))]
     projects-git))
 
-;;file met project commit bullshit
-
-
-;;importeer project
 (defn import-project-location
   "Given a File object of a .git folder, imports the project into the Eclipse
    workspace in which Qwalkeko is active. The imported project will have only
@@ -65,11 +81,25 @@
           proc (.start pb)]
       (.waitFor proc)
       (.open project nil)
-      (damp.util.Natures/addNature project  qwalkeko.HistoryNature/NATURE_ID)
-      (damp.util.Natures/addNature project  damp.ekeko.EkekoNature/NATURE_ID)
-      ;;add sleep
+      (damp.util.Natures/addNature project qwalkeko.HistoryNature/NATURE_ID)
+      (damp.util.Natures/addNature project damp.ekeko.EkekoNature/NATURE_ID)
+      ; Poor man's "refresh after Nature analysis is done"
+      (Thread/sleep 10000)
       (.refreshLocal project org.eclipse.core.resources.IProject/DEPTH_INFINITE nil)
       project)))
+
+(defn import-projects
+  "Given a string representing a folder with projects, import each of them in
+   Eclipse. Set up the correct Natures (Qwalkeko and Ekeko). Returns a list of
+   the Eclipse projects."
+  [projects-folder-string]
+  (let [projects-git (get-projects-git projects-folder-string)]
+    (map import-project-location projects-git)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Finding changes ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn convert-project-to-graph
   "Given an eclipse project (not ekeko project), creates the graph after
@@ -109,3 +139,16 @@
     (graph/ensure-delete breaking)
     (graph/ensure-delete fixing)
     (list changed changes)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Actual action ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Folder in which to clone the different projects
+(def PROJECT_FOLDER "/Users/ward/Documents/phd/paper-mergeerrorpatterns/projects")
+; File containing GitHub projects (line per line)
+(def PROJECT_FILE "/Users/ward/Documents/phd/paper-mergeerrorpatterns/github_projects.txt")
+
+;(clone-projects PROJECT_FOLDER PROJECT_FILE)
+;(import-projects PROJECT_FOLDER)

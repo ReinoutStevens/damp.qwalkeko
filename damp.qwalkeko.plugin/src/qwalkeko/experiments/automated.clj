@@ -16,7 +16,24 @@
 
 
 ;;Folder met al de projecten
+(def PROJECT_FOLDER "/Users/ward/Documents/phd/paper-mergeerrorpatterns/projects")
 
+
+(defn is-git-folder
+  "Check whether a given File object is a .git folder"
+  [folder]
+  (and
+    (.isDirectory folder)
+    (= ".git" (.getName folder))))
+
+(defn get-projects-git
+  "Get File objects for the .git/ folder of every project in project-folder string."
+  [project-folder]
+  (let [folder (io/file project-folder)
+        projects (filter #(.isDirectory %) (.listFiles folder))
+        projects-subfolders (map #(.listFiles %) projects)
+        projects-git (flatten (map #(filter is-git-folder %) projects-subfolders))]
+    projects-git))
 
 ;;file met project commit bullshit
 

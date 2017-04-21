@@ -29,11 +29,10 @@
     (shell/sh "git" "clone" "-q" ghlink clone-folder)))
 
 (defn clone-projects
-  "Given a location to clone projects in and a file with one GitHub project per
-   line, clone every project into the folder. Both arguments are strings."
-  [dll-folder info-file]
-  (let [projects (string/split-lines (slurp info-file))]
-    (map #(clone-project dll-folder %) projects)))
+  "Given a location to clone projects in (string) and a list of GitHub projects (user/repo),
+   clone every project into the folder."
+  [dll-folder projects]
+    (map #(clone-project dll-folder %) projects))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -140,15 +139,41 @@
     (graph/ensure-delete fixing)
     (list changed changes)))
 
+(defn read-breaker-fixer-csv
+  "Takes the path to a CSV dump of the form: \"project\",\"breaker\",\"fixer\",\"breaker_tr\",\"fixer_tr\".
+   The CSV dump has a header row, which we drop. Returns list of lists"
+  [filelocation]
+  (let [file (slurp filelocation)
+        lines (drop 1 (string/split file #"\n"))
+        cleaned-lines (map #(string/replace % #"\"" "") lines)
+        entries (map #(string/split % #",") cleaned-lines)]
+    entries))
+
+(defn create-project-list
+  "Gets a list of unique projects (strings) given a parsed CSV dump"
+  [parsed-csv]
+  (let [projects (map first parsed-csv)]
+    (distinct projects)))
+
+; What left TODO:
+; We have an eclipse list of imported projects. For each of the projects, need to get the commit SHAs that are a part of it.
+; -> Need to link name to the eclipse project object
+; -> Need to get the relevant SHAs given a name
+; Then for that project you need to execute the project to graph stuff + add the AST changes to the blob of info.
+; -> Create an object of sorts that has project name, breaker SHA, fixer SHA, changes?
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Actual action ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 ; Folder in which to clone the different projects
-(def PROJECT_FOLDER "/Users/ward/Documents/phd/paper-mergeerrorpatterns/projects")
-; File containing GitHub projects (line per line)
-(def PROJECT_FILE "/Users/ward/Documents/phd/paper-mergeerrorpatterns/github_projects.txt")
+(def PROJECT_FOLDER "/Users/ward/Documents/phd-docs/paper-mergeerrorpatterns/projects")
+; File containing the CSV dump
+(def COMMITS_DUMP "/Users/ward/Documents/phd-docs/paper-mergeerrorpatterns/test_fixers.csv")
 
-;(clone-projects PROJECT_FOLDER PROJECT_FILE)
+(def BREAKERFIXER (read-breaker-fixer-csv COMMITS_DUMP))
+(def PROJECTS (create-project-list BREAKERFIXER))
+
+;(clone-projects PROJECT_FOLDER PROJECTS)
 ;(import-projects PROJECT_FOLDER)

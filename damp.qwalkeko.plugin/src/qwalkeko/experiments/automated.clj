@@ -109,11 +109,34 @@
     (graph/convert-model-to-graph history)))
 
 
+(defn is-qwalkeko-project-named?
+  "Predicate to check whether a Qwalkeko project has a certain name. The /
+   separating GitHub user and project is changed to a -."
+  [project name]
+  (= (string/replace name #"/" "-") (.getName (.getProject project))))
+
+(defn convert-project-name-to-graph
+  "Given the name of a project ('user/repo'), find the project and create a graph"
+  [projectname]
+  (let [projects (damp.ekeko.ekekomodel/all-project-models)
+        history (first (filter #(is-qwalkeko-project-named? % projectname) projects))]
+    (graph/convert-model-to-graph history)))
+
 (defn find-commit-in-graph
   "Given a project graph and a commit SHA, finds the commit object"
   [graph id]
   (first (filter #(= (graph/revision-number %) id) (:versions graph))))
 
+(defn fuckyou [versie]
+  "Because having qwal/=>+ in find-changes caused too much backtracking apparently."
+  (letfn [(fuckyou-intern [g curr ?end]
+            (logic/condu
+              [(logic/== curr versie)
+               (logic/== ?end versie)]
+              [(logic/fresh [?next]
+                 (qwal/trans g curr ?next)
+                 (fuckyou-intern g ?next ?end))]))]
+    fuckyou-intern))
 
 (defn find-changes
   "Given a graph and the breaking and fixing commits, returns a list of changed
@@ -127,9 +150,7 @@
                         (qwal/qwal graph breaking ?end [?left ?right]
                           (l/in-source-code [curr]
                             (l/fileinfo|compilationunit changed ?left curr))
-                          (qwal/q=>+)
-                          (l/in-git-info [curr]
-                            (logic/== curr fixing))
+                          (fuckyou fixing)
                           (l/in-source-code [curr]
                             (l/fileinfo|compilationunit changed ?right curr)
                             (changes/ast-ast-changes ?left ?right ?changes)))))
@@ -155,12 +176,44 @@
   (let [projects (map first parsed-csv)]
     (distinct projects)))
 
-; What left TODO:
-; We have an eclipse list of imported projects. For each of the projects, need to get the commit SHAs that are a part of it.
-; -> Need to link name to the eclipse project object
-; -> Need to get the relevant SHAs given a name
-; Then for that project you need to execute the project to graph stuff + add the AST changes to the blob of info.
-; -> Create an object of sorts that has project name, breaker SHA, fixer SHA, changes?
+
+(defn handle-change
+  "Helper function (define it in find-all-changes?). Given the graph of a
+   project and a change entry (a list of project, breaker sha, fixer sha,
+   breaker tr id, fixer tr id), finds the actual changes and returns an ad-hoc
+   'object' containing the inputted information + the found changes."
+  [graph change]
+  (let [breaking (find-commit-in-graph graph (nth change 1))
+        fixing (find-commit-in-graph graph (nth change 2))
+        changes (find-changes graph breaking fixing)]
+    {
+     :project (nth change 0),
+     :breaking (nth change 1),
+     :fixing (nth change 2),
+     :breaking_tr (nth change 3),
+     :fixing_tr (nth change 4),
+     :changed (first changes),
+     :changes (second changes)
+    }))
+
+(defn handle-project
+  "Helper function (define it in find-all-changes?). Given a project name and
+   a list of change entries (see handle-change), creates a graph, finds the
+   changes for the entries and returns it all."
+  [entry]
+  (let [name (first entry)
+        changes (second entry)
+        g (convert-project-name-to-graph name)]
+    (map #(handle-change g %) changes)))
+
+(defn find-all-changes
+  "Given a list of changes, each a list of project, breaker sha, fixer sha,
+   breaker tr id, fixer tr id, finds the AST changes of each and returns it
+   all."
+  [changelist-ungrouped]
+  (let [changelist (group-by first changelist-ungrouped)]
+    (flatten (map handle-project changelist))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Actual action ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -177,3 +230,4 @@
 
 ;(clone-projects PROJECT_FOLDER PROJECTS)
 ;(import-projects PROJECT_FOLDER)
+;(find-all-changes BREAKERFIXER)

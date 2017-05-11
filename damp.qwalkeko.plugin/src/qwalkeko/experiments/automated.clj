@@ -64,6 +64,10 @@
    overrides the usual Ekeko building with its own (HistoryProjectModel.buildMetaProduct),
    which creates a resources/ folder within the project.
 
+   To (hopefully) save memory and avoid GC crashes, the projects are closed
+   after the nature has been added. Opening should be done before looking for
+   changes.
+
    The code here is a clojure translation of the code in ImportRepositoryHandler.java"
   [location]
   (let [project-name (.getName (.getParentFile location))
@@ -81,9 +85,10 @@
       (.waitFor proc)
       (.open project nil)
       (damp.util.Natures/addNature project qwalkeko.HistoryNature/NATURE_ID)
-      (damp.util.Natures/addNature project damp.ekeko.EkekoNature/NATURE_ID)
+      ;(damp.util.Natures/addNature project damp.ekeko.EkekoNature/NATURE_ID)
       ; Poor man's "refresh after Nature analysis is done"
       (Thread/sleep 10000)
+      (.close project nil)
       (.refreshLocal project org.eclipse.core.resources.IProject/DEPTH_INFINITE nil)
       project)))
 
@@ -99,6 +104,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Finding changes ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Some obvious overlap between the following few functions.
 
 (defn convert-project-to-graph
   "Given an eclipse project (not ekeko project), creates the graph after
@@ -121,6 +128,17 @@
   (let [projects (damp.ekeko.ekekomodel/all-project-models)
         history (first (filter #(is-qwalkeko-project-named? % projectname) projects))]
     (graph/convert-model-to-graph history)))
+
+(defn sanitize-project-name
+  [name]
+  (string/replace name #"/" "-"))
+
+(defn get-eclipse-project-by-project-name
+  [projectname]
+  (let [eclipseroot (.getRoot (org.eclipse.core.resources.ResourcesPlugin/getWorkspace))
+        name (sanitize-project-name projectname)
+        project (.getProject eclipseroot name)]
+    project))
 
 (defn find-commit-in-graph
   "Given a project graph and a commit SHA, finds the commit object"
@@ -198,13 +216,22 @@
 
 (defn handle-project
   "Helper function (define it in find-all-changes?). Given a project name and
-   a list of change entries (see handle-change), creates a graph, finds the
-   changes for the entries and returns it all."
+   a list of change entries (see handle-change), it returns the Qwalkeko changes
+   for the entries."
   [entry]
   (let [name (first entry)
-        changes (second entry)
-        g (convert-project-name-to-graph name)]
-    (map #(handle-change g %) changes)))
+        project (get-eclipse-project-by-project-name name)
+        changes (second entry)]
+    (.open project nil)
+    (damp.util.Natures/removeNature project damp.ekeko.EkekoNature/NATURE_ID)
+    (damp.util.Natures/addNature project damp.ekeko.EkekoNature/NATURE_ID)
+    ; Poor man's "refresh after Ekeko population is done"
+    (Thread/sleep 10000)
+    (let [g (convert-project-name-to-graph name)
+          results (map #(handle-change g %) changes)]
+      (damp.util.Natures/removeNature project damp.ekeko.EkekoNature/NATURE_ID)
+      (.close project nil)
+      results)))
 
 (defn find-all-changes
   "Given a list of changes, each a list of project, breaker sha, fixer sha,

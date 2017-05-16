@@ -405,24 +405,36 @@
 
 (defn- link-list-dependents [graph]
   "links operations in the same ChildListProperty in a linked list (without deletes)"
-  (defn link-group [graph group]
-    ;;group is a list of nodes, at index i we find the parent of i+1 etc
-    (let [parent-child (partition 2 1 group)] ;;we group together a parent and its child
+  (letfn
+    [(sort-group [group]
+       (sort
+         (fn [x y]
+           (or
+             (< (:index x) (:index y))
+             ;;two inserts with the same index
+             ;;the one that is inserted later is a parent of the other
+             (and 
+               (= (:index x) (:index y))
+               (< (:graph-idx y) (:graph-idx x)))))
+         group))
+     (link-group [graph group]
+       ;;group is a list of nodes, at index i we find the parent of i+1 etc
+       (let [parent-child (partition 2 1 group)] ;;we group together a parent and its child
+         (reduce
+           (fn [graph pc]
+             (let [parent (first pc)
+                   child (second pc)]
+               (change-add-list-dependency graph child parent)))
+           graph
+           parent-child)))]
+    (let [changes (:changes graph)
+          listchanges (remove delete? (filter list-operation? changes))
+          grouped (group-by :left-parent listchanges)]
       (reduce
-        (fn [graph pc]
-          (let [parent (first pc)
-                child (second pc)]
-            (change-add-list-dependency graph child parent)))
+        (fn [graph group]
+          (link-group graph (sort-group group)))
         graph
-        parent-child)))
-  (let [changes (:changes graph)
-        listchanges (remove delete? (filter list-operation? changes))
-        grouped (group-by :left-parent listchanges)]
-    (reduce
-      (fn [graph group]
-        (link-group graph (sort-by :index group)))
-      graph
-      (mapcat #(vals (group-by :property %)) (vals grouped)))))
+        (mapcat #(vals (group-by :property %)) (vals grouped))))))
 
 (defn- link-delete-dependents [graph]
   "adds deletes to groups of linked operations"
